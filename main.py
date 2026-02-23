@@ -1,4 +1,6 @@
 # przerzuć wszystkie dane do /data. Zwróć uwagę, że gitignore sprawia, że nie wrzucisz ich do repozytorium (to dobrze)
+# stwórz nowe wirtualne środowisko i aktywuj je
+# zainstaluj potrzebne biblioteki - zwróć uwagę, że masz pliik requirements.txt -> żeby go użyć wklej w terminal: pip install -r requirements.txt
 
 # poczytaj o:
 # 1 - numpy
