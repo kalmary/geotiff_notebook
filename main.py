@@ -27,9 +27,14 @@ from pathlib import Path
 
 
 # 1
-with rio.open('geotiff_notebook/data/wrzaca 138 2025-05-13-ORTHO-NDVI.data.tif') as dataset:
+with rio.open('data/czarna 121 2025-04-22-ORTHO-NDVI.data.tif') as dataset:
     array = dataset.read(1)
     nodata = dataset.nodata
+
+# mozna tez tak
+dataset = rio.open('data/czarna 121 2025-04-22-ORTHO-NDVI.data.tif')
+
+
      
 # print (dataset.name)
 # print (dataset.count)
@@ -47,6 +52,7 @@ plt.imshow(array,
               cmap='RdYlGn', 
               vmin= -1,
               vmax = 1)
+plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
 plt.show()
 
 # 3 'nodata': - 10000
@@ -63,17 +69,23 @@ print("min, max, mean wartosc macierzy\n", np.nanmin(array), np.nanmax(array), n
 
 #5
 
-def zabawa5(datafile , extension):
-        idk = []
-        p = Path(datafile)
-        for x in p.iterdir():
-            if x.suffix == extension:
-                idk.append(x)
+# def zabawa5(datafile , extension):
+#         idk = []
+#         p = Path(datafile)
+#         for x in p.iterdir():
+#             if x.suffix == extension:
+#                 idk.append(x)
 
-        return(idk)
+#         return(idk)
 
-lista = zabawa5('geotiff_notebook/data', '.tif')
-print(lista)
+
+
+# lista = zabawa5('geotiff_notebook/data', '.tif')
+
+path2file = Path('data')
+ext = '.tif'
+path_list = list(path2file.glob(f'*{ext}'))
+print(path_list)
 
 
 # def zabawa52(do poprawy):
@@ -89,6 +101,7 @@ print(lista)
 # 6  z density=True wychodza mi wartosci prawdopodobienstwa ponad 1 (chyba bo bardzo ciasne bins, wiec bez density jest)
 array_clean = array[~np.isnan(array)]
 plt.figure(figsize=(8,5))
+
 plt.title('umiem dodawac tytul jej')
 plt.xlabel('wartosci indeksu NDVI')
 plt.ylabel('liczba razy wystapienia danej wartosci')
