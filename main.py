@@ -87,6 +87,9 @@ path2file = Path('data')
 ext = '.tif'
 path_list = list(path2file.glob(f'*{ext}'))
 print(path_list)
+# test
+# test
+# test
 
 
 # def zabawa52(do poprawy):
