@@ -35,8 +35,8 @@ with rio.open('data/czarna 121 2025-04-22-ORTHO-NDVI.data.tif') as dataset:
 dataset = rio.open('data/czarna 121 2025-04-22-ORTHO-NDVI.data.tif')
 
 
-    # pozdrawiam
-    
+# pozdrawiam
+
 # print (dataset.name)
 # print (dataset.count)
 # print (dataset.width)
