@@ -8,13 +8,15 @@ import loader
 from loader import load_data
 from pathlib import Path
 import numpy as np
-from matplotlib import pyplot as plt 
+from matplotlib import pyplot as plt
+from modifiers import NDVIdecrease
 
 def main():
 
     # print(type(load_data))
     # gen = load_data('data', '.tif')
     # print(gen)
+
     for dataset in load_data('data', '.tif'):
         array = dataset.read(1)
         nodata = dataset.nodata
@@ -28,7 +30,7 @@ def main():
         
         print (dataset)
 
-    plt.show()
+        plt.show()
 
 if __name__ == "__main__":
     main()

@@ -5,8 +5,6 @@
 # 1.3 W forze wczytaj pliki z użyciem rasterio
 # 1.4 Po wczytaniu pliku funkcja ma go zwrócić (cały dataset) i dopiero wtedy wczytywać kolejny plik.
 
-print("LOADER FILE LOADED")
-
 from pathlib import Path
 import rasterio as rio
 
