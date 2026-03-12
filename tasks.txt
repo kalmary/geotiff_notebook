@@ -17,7 +17,7 @@
 4.4 Zastanów się jak wydobyć z klasy zmodyfikowany rezultat - dodałem odpowiednią metodę, która do tego służy.
 4.5 Zrób wykres, który przedstawi nasz wynik.
 
-Jeśli rezultat będzie słaby - jest ok, wciąż dopracowujemy parametry. Jutro (12.03) napiszę rozwiązanie na oddzielnym branchu. Głównie, żeby sprawdzić czy nie ma błędu, ale jeśli będziesz chciał je podejrzeć, musisz znaleźć sposób na przełączenie się na ten branch.
+Jeśli rezultat będzie słaby - jest ok, wciąż dopracowujemy parametry. Rozwiązanie jest na oddzielnym branchu. Głównie, żeby sprawdzić czy nie ma błędu, ale jeśli będziesz chciał je podejrzeć, musisz znaleźć sposób na przełączenie się na ten branch.
 
 
     
