@@ -27,10 +27,16 @@ class DegradationEvent:
 
 class NDVIdecreaseSimulator:
 
-    ALTITUDE = 0.5 # multiplier for radius/ size params. Higher we are -> smaller effect we can see
+    ALTITUDE_SCALE = 0.5 # multiplier for radius/ size params. Higher we are -> smaller effect we can see
 
     def __init__ (self, ndvi_array: np.ndarray): 
         self.ndvi_array = ndvi_array
+
+        self.ndvi_array = np.where(
+            np.isnan(self.ndvi_array),
+            np.nan,
+            np.clip(self.ndvi_array, -1.0, 1.0)
+        )
 
         assert self.ndvi_array.ndim == 2, "ndvi_array must be 2-dimensional"
         assert np.all((self.ndvi_array >= -1) & (self.ndvi_array <= 1)), "ndvi_array values must be between -1 and 1"
@@ -38,7 +44,7 @@ class NDVIdecreaseSimulator:
         self.original_ndvi = self.ndvi_array.copy()
         self.shape = self.ndvi_array.shape
 
-        self.S = min(self.H, self.W) # to scale our parameters based on resolution (not metric dimiensions)
+        self.S = min(self.shape[0], self.shape[1]) # to scale our parameters based on resolution (not metric dimiensions)
 
         self.masks: dict[str, np.ndarray] = {}
 
@@ -56,16 +62,16 @@ class NDVIdecreaseSimulator:
         # Intensity with per-pixel Gaussian noise — makes the affected zone
         # non-uniform, mimicking real spectral variation within a damage patch
         intensity_map = rng.normal(event.intensity, event.intensity_std,
-                                   size=(self.H, self.W))
+                                   size=self.shape)
         intensity_map = np.clip(intensity_map, 0.0, 1.0)
 
         reduction = total_mask * intensity_map
-        self.ndvi = np.clip(self.ndvi - reduction, -1.0, 1.0)
+        self.ndvi_array = np.clip(self.ndvi_array - reduction, -1.0, 1.0)
         return self
 
     @property
     def result(self) -> np.ndarray:
-        return self.ndvi
+        return self.ndvi_array
 
     def _generate_mask (self, cause: str, rng: np.random.Generator) -> np.ndarray:
         """
@@ -80,10 +86,10 @@ class NDVIdecreaseSimulator:
                 2D array of floats between 0 and 1, with 1 indicating the affected area
         """
         dispatch = {
-            "boars": self._mask_boars,
-            "storm": self._mask_storm,
-            "drought": self._mask_drought,
-            "flooding": self._mask_flooding
+            "boars": self._mask_boars
+            # "storm": self._mask_storm,
+            # "drought": self._mask_drought,
+            # "flooding": self._mask_flooding
         }
 
         return dispatch[cause](rng)
@@ -135,7 +141,7 @@ class NDVIdecreaseSimulator:
         noise = rng.standard_normal(self.shape)
         noise = gaussian_filter(noise, sigma=r * 0.4)
 
-        Y, X = np.ogrid[:self.H, :self.W]
+        Y, X = np.ogrid[:self.shape[0], :self.shape[1]]
         dist = np.sqrt((X - cx)**2 + (Y - cy)**2)
 
         # Warp boundary: the effective radius varies with noise
@@ -161,6 +167,22 @@ class NDVIdecreaseSimulator:
     # obnizenie calego indeksu na polu, ale moze gradientowo tak, w czescie polnocnej bardziej niz
 
 if __name__ == "__main__":
-    decrease_simulator = NDVIdecreaseSimulator(np.array([[1, 0.5], [0.5, 0]]))
-    decrease_simulator.boars()
-    decrease_simulator.storm()
+    from loader import load_data
+    from matplotlib import pyplot as plt
+
+    for dataset in load_data(source_dir="data", extension=".tif"):
+        ndvi = dataset.read(1)
+        decrease_simulator = NDVIdecreaseSimulator(ndvi_array=ndvi)
+
+        decrease_simulator.apply(DegradationEvent(cause="boars", seed=42, count=3, intensity=0.4))
+        ndvi_mod = decrease_simulator.result
+
+        plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
+        plt.imshow(np.where(np.isnan(ndvi), -999, ndvi),
+                cmap='RdYlGn',
+                vmin=-1,
+                vmax=1)
+        # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
+
+        plt.show()
+    

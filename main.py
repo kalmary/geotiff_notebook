@@ -22,10 +22,10 @@ def main():
         nodata = dataset.nodata
         array = np.where(array == nodata, np.nan, array) 
         plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
-        plt.imshow(array, 
-              cmap='RdYlGn', 
-              vmin= -1,
-              vmax = 1)
+        plt.imshow(np.where(np.isnan(array), -999, array), # this line prevents matplotlib from struggling when trying to display nan
+                cmap='RdYlGn',
+                vmin=-1,
+                vmax=1)
         # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
         
         print (dataset)
