@@ -44,13 +44,25 @@ class NDVIdecreaseSimulator:
         self.original_ndvi = self.ndvi_array.copy()
         self.shape = self.ndvi_array.shape
 
-        self.S = min(self.shape[0], self.shape[1]) # to scale our parameters based on resolution (not metric dimiensions)
+        self.S = min(self.shape[0], self.shape[1]) # to scale our parameters based on resolution (not metric dimensions)
 
         self.masks: dict[str, np.ndarray] = {}
 
     def apply(self, event: DegradationEvent) -> "NDVIdecreaseSimulator":
-        rng = np.random.default_rng(event.seed)
-        total_mask = np.zeros(self.shape, dtype=float)
+        """
+        Apply a degradation event to the NDVI array.
+        Args:
+            event::DegradationEvent
+                Event to apply
+
+        Returns:
+            self::NDVIdecreaseSimulator
+                Returns itself so calls can be chained
+
+        """
+
+        rng = np.random.default_rng(event.seed) # random generator with fixed seed - guesses are deterministic in another runs
+        total_mask = np.zeros(self.shape, dtype=float) # mask with full zeros
 
         for _ in range(event.count):
             raw = self._generate_mask(event.cause, rng)
