@@ -166,23 +166,4 @@ class NDVIdecreaseSimulator:
     # susza suszy 
     # obnizenie calego indeksu na polu, ale moze gradientowo tak, w czescie polnocnej bardziej niz
 
-if __name__ == "__main__":
-    from loader import load_data
-    from matplotlib import pyplot as plt
-
-    for dataset in load_data(source_dir="data", extension=".tif"):
-        ndvi = dataset.read(1)
-        decrease_simulator = NDVIdecreaseSimulator(ndvi_array=ndvi)
-
-        decrease_simulator.apply(DegradationEvent(cause="boars", seed=42, count=3, intensity=0.4))
-        ndvi_mod = decrease_simulator.result
-
-        plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
-        plt.imshow(np.where(np.isnan(ndvi), -999, ndvi),
-                cmap='RdYlGn',
-                vmin=-1,
-                vmax=1)
-        # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
-
-        plt.show()
     
