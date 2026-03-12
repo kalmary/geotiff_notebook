@@ -1,34 +1,23 @@
-6.03.2026
-Wniosek po wczoraj, który jest trochę odmienny niż to co zapowiadałem:
-Będziemy rozdzielać kod na nieco więcej plików. Zobaczysz, że nie komplikuje to twojej pracy, za to struktura będzie wiele czytelniejsza
+11.03.2026
 
-Kiedy tworzysz nową funkcję w oddzielnym pliku i chcesz ją zaimportować do main.py: "from nazwa_twojego_pliku_bez_py import twoja funkcja"
-Z klasą jest analogicznie, tylko importujesz całą klasę. Możesz też importować funkcje znajdujące się w podfolderach, ale na ten moment skomplikowałoby to nasz kod:
-from utils.load_files import load_config
-gdzie utils to folder z "narzędziami", które wykorzystujesz w wielu miejscach kodu, load_files to plik zawierający różne funkcje do wczytywania plików,
-a load config służy do wczytania konfiguracji
+1. Przeczytaj dokładnie treść kodu w modifiers. Dodałem dokładną dokumentację, która tłumaczy wszyyyystko co dzieje się do tej pory. Jeśli to nie pomoże, chat też wyjaśni
+2. Dopisz w odpowiednich miejscach brakujące metody:
+    [
+        "wild_boar", "storm", "flooding", "drought", "frost",
+        "pest_infestation", "fungal_disease", "machinery_tracks",
+        "irrigation_failure", "herbicide_drift", "fertilizer_burn",
+        "deer_grazing", "fire", "compaction", "salinization"
+    ] - same deklaracje, bez konkretnej treści. Jeśli jakaś modyfikacja Ci się nie podoba/ uważasz, że jest zbyt rzadka, nie dodawaj jej.
+
+3. Poczytaj jak wyglądają wybrane modyfikacje NDVI - najlepiej jeśli zdobędziesz jakieś obrazkowe przykłady
+4. Napisz kod do testowania modifiers.py:
+4.1 Niech wczyta dowolny plik .tif
+4.2 Niech wybierze tylko ndvi
+4.3 Użyj naszej klasy do modyfikacji indeksu z wykorzystaniem metody odpowiadającej za dziki (podpowiedź - potrzebujesz metody, których używa zwykły użytkownik tej klasy - nie osoba, która pisze samą klasę)
+4.4 Zastanów się jak wydobyć z klasy zmodyfikowany rezultat - dodałem odpowiednią metodę, która do tego służy.
+4.5 Zrób wykres, który przedstawi nasz wynik.
+
+Jeśli rezultat będzie słaby - jest ok, wciąż dopracowujemy parametry. Jutro (12.03) napiszę rozwiązanie na oddzielnym branchu. Głównie, żeby sprawdzić czy nie ma błędu, ale jeśli będziesz chciał je podejrzeć, musisz znaleźć sposób na przełączenie się na ten branch.
 
 
-
-1. utwórz w folderze projektu nowy plik: Loader.py
-1.1 Niech plik zawiera funkcję load_data. 
-1.2 Funkcja musi przyjmować (wskaż typ) argument source_dir (typ string) i extension (typ string). Musi przetwarzać tego stringa do pth.Path.
-    Następnie niech stworzy listę ścieżek do wszystkich plików z wybramym rozszerzeniem, znajdujących się w tym folderze.
-1.3 W forze wczytaj pliki z użyciem rasterio
-1.4 Po wczytaniu pliku funkcja ma go zwrócić (cały dataset) i dopiero wtedy wczytywać kolejny plik.
-
-
-2. W pliku main.py:
-2.1 Stwórz strukturę która uniknie zmiennych i funkcji globalnych (def main + if __name__ == "__main__": main())
-2.2 Zaimportuj load data
-2.3 W def main() wywołaj funkcję load_data - funkcja musi działać w pętli. Splotuj ndvi (tak jak ostatnio) kolejno dla każdego kolejnego wykresu. 
-    Z gwiazdką: wykresy muszą pokazać się wszystkie naraz (który element odpowiada za ich wyświetlanie?)
-
-3. strów w folderze projektu plik Modifiers.py:
-3.1 Stwórz w nim klasę NDVIdecrease - niech (póki co) argumentem w metodzie __init__ będzie ndvi_array (typ: np.ndarray)
-3.2 Klasa ma posiadać metody, które zmodyfikują ndvi_array. Póki co nie będziemy tych metod rozpisywać dokładnie, ale:
-3.2.1 Przygotuj kilka metod (same nazwy i opis metod, co robią, w komentarzach pod nimi), które będą modyfikować (symulować zniszczenia pól) macierz ndvi.
-      Żeby program nie zgłaszał błędu, każda metoda powinna printować rozmiar ndvi_array.
-3.3 Zaimportuj klasę do main i po wczytaniu pliku tif wg. punktu 1., użyj każdej metody. 
-      
     

@@ -42,26 +42,25 @@ class NDVIdecreaseSimulator:
 
         self.masks: dict[str, np.ndarray] = {}
 
-    def apply(self, event: DegradationEvent) -> NDVIdecreaseSimulator:
+    def apply(self, event: DegradationEvent) -> "NDVIdecreaseSimulator":
         rng = np.random.default_rng(event.seed)
-        total_mask = np.zeros((self.H, self.W), dtype=float)
+        total_mask = np.zeros(self.shape, dtype=float)
 
         for _ in range(event.count):
             raw = self._generate_mask(event.cause, rng)
-            # Apply sharpening specific to this cause
-            sharpened = sharpen(raw, SHARPNESS[event.cause])
-            total_mask = np.clip(total_mask + sharpened, 0, 1)
+            total_mask = np.clip(total_mask + raw, 0, 1)
 
         label = f"{event.cause} (x{event.count})"
         self.masks[label] = total_mask
 
+        # Intensity with per-pixel Gaussian noise — makes the affected zone
+        # non-uniform, mimicking real spectral variation within a damage patch
         intensity_map = rng.normal(event.intensity, event.intensity_std,
                                    size=(self.H, self.W))
         intensity_map = np.clip(intensity_map, 0.0, 1.0)
 
         reduction = total_mask * intensity_map
         self.ndvi = np.clip(self.ndvi - reduction, -1.0, 1.0)
-
         return self
 
     @property
@@ -69,18 +68,39 @@ class NDVIdecreaseSimulator:
         return self.ndvi
 
     def _generate_mask (self, cause: str, rng: np.random.Generator) -> np.ndarray:
-        distapch = {
-            "boars": self._generate_boars_mask,
-            "storm": self._generate_storm_mask,
-            "drought": self._generate_drought_mask,
-            "flooding": self._generate_flooding_mask
+        """
+        Args:
+            cause::[str]
+                One of decrease ndvi options:boars, storm etc
+            rng::Generator
+                Random number generator with predefined seed -> returns deterministic results
+
+        Returns:
+            mask::ndarray
+                2D array of floats between 0 and 1, with 1 indicating the affected area
+        """
+        dispatch = {
+            "boars": self._mask_boars,
+            "storm": self._mask_storm,
+            "drought": self._mask_drought,
+            "flooding": self._mask_flooding
         }
 
-        return distapch[cause](rng)
+        return dispatch[cause](rng)
     
     def _cx_cy(self, rng: np.random.Generator, margin: float = 0.15) -> tuple[int, int]:
         """
         Generate random center coordinates (cx, cy) for an event, ensuring they are not too close to the edges of the NDVI array. The margin parameter defines how far from the edges the center can be, as a fraction of the array dimensions. For example, with margin=0.15, the center will be at least 15% of the width/height away from the edges.
+
+
+        Args:
+            rng::Generator
+                Random number generator with predefined seed
+            margin::float
+                Margin from the edges, as a fraction of the array dimensions (default: 0.15)
+        Returns:
+            cx, cy::tuple[int, int]
+                Random center coordinates
         """
 
         cx = rng.integers(int(self.shape[1]*margin), int(self.shape[1]*(1-margin)))
@@ -88,6 +108,24 @@ class NDVIdecreaseSimulator:
         return cx, cy
 
     def _mask_boars(self, rng):
+        """
+        1. pick random center point
+        2. generate noise field with shape of full array
+        3. blur the noise field - more regular look
+        4. use gaussian bell:
+        4.1 distance from circle center - noise modified by r and strength creates circle with 0-1 values with irregular edges 
+
+
+        Args:
+            rng::Generator
+                Random number generator with predefined seed
+
+        Returns:
+            mask::ndarray
+                2D array of floats between 0 and 1, with 1 indicating the affected area
+        """
+
+
         cx, cy = self._cx_cy(rng, margin=0.15) # random circle center, margin avoids edges
         
         r = gauss(rng, 0.04 * self.S * self.ALTITUDE_SCALE,
