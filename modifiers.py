@@ -161,6 +161,6 @@ class NDVIdecreaseSimulator:
     # obnizenie calego indeksu na polu, ale moze gradientowo tak, w czescie polnocnej bardziej niz
 
 if __name__ == "__main__":
-    decrease_simulator = NDVIdecreaseSimulater(np.array([[1, 0.5], [0.5, 0]]))
+    decrease_simulator = NDVIdecreaseSimulator(np.array([[1, 0.5], [0.5, 0]]))
     decrease_simulator.boars()
     decrease_simulator.storm()
