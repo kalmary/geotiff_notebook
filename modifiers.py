@@ -161,12 +161,84 @@ class NDVIdecreaseSimulator:
         mask = np.exp(-((dist - noise * r * warp_strength) / (r * 0.4))**2)
         return np.clip(mask, 0, 1)
 
+    def _mask_storm(self, rng):
+        """
+        Wind lodging: 2–5 parallel stripes across most of the field.
+        Direction fully random (0–360°).
 
+        Uses the same warp philosophy as _mask_wild_boar:
+        - smoothed noise field shifts the effective stripe boundary per pixel
+            → organic, meandering edges instead of perfect Gaussians
+        - coarse noise (σ ≈ 10% S) handles large meanders
+        - fine noise   (σ ≈ 2.5% S) adds local roughness
+        - per-pixel intensity modulation inside each stripe (same as boar)
+        - scattered debris pixels masked to the damaged zone
+        """
+        angle = rng.uniform(0, 2 * np.pi) # angle of wind direction - 0 - 360 deg
 
-    def boars (self):
-        print(self.ndvi_array.ndim)
-    # dziki ryjace w polu i niszczace je, mysle, ze na zasadzie pedzla (wielkosc do ustalenia) ktory znaczaco obniza NDVI
-    # w danym miejscu + pewnie jakas sciezka od boku pola. do pomyslenia czy jakos symulujemy zachowania stada czy pojedyncze dziki
+        Y, X = np.ogrid[:self.H, :self.W] 
+        cx, cy = self._cx_cy(rng)
+
+        along = (X - cx) * np.cos(angle) + (Y - cy) * np.sin(angle)
+        perp  = -(X - cx) * np.sin(angle) + (Y - cy) * np.cos(angle)
+
+        # Along-wind taper — soft ends, same Gaussian bell as boar boundary
+        diag         = np.sqrt(self.H**2 + self.W**2) / 2
+        length       = diag * gauss(rng, 0.85, 0.08, lo=0.65, hi=1.0)
+        along_weight = np.exp(-(along / (length * 0.55))**2)
+
+        # Two shared noise fields (built once, reused per stripe)
+        # Mirrors boar: single noise field smoothed at patch scale
+        noise_coarse = gaussian_filter(rng.standard_normal((self.H, self.W)),
+                                    sigma=self.S * 0.10)
+        noise_fine   = gaussian_filter(rng.standard_normal((self.H, self.W)),
+                                    sigma=self.S * 0.025)
+
+        n_stripes  = max(2, int(gauss(rng, 3, 1, lo=2, hi=5)))
+        field_half = gauss(rng, 0.35 * self.S, 0.05 * self.S,
+                        lo=0.2 * self.S, hi=0.48 * self.S)
+        centers    = np.linspace(-field_half, field_half, n_stripes)
+        centers   += rng.normal(0, 0.03 * self.S, size=n_stripes)
+
+        mask = np.zeros((self.H, self.W))
+        for c in centers:
+            # Stripe half-width — Gaussian sampled, analogous to boar radius r
+            r = gauss(rng, 0.04 * self.S, 0.008 * self.S,
+                    lo=0.012 * self.S, hi=0.07 * self.S)
+
+            # Warp strengths — same role as boar's warp_strength
+            warp_coarse = gauss(rng, 0.6, 0.12, lo=0.2, hi=1.0)
+            warp_fine   = gauss(rng, 0.25, 0.08, lo=0.05, hi=0.5)
+
+            # Warped perpendicular distance — directly mirrors boar:
+            #   boar:  dist  - noise * r * warp_strength
+            #   storm: perp  - noise * r * warp_strength  (1D analogue)
+            perp_warped = (perp - c) - (noise_coarse * r * warp_coarse
+                                    + noise_fine   * r * warp_fine)
+
+            # Gaussian bell on warped distance — identical formula to boar
+            stripe = np.exp(-((perp_warped) / (r * 0.4))**2)
+
+            # Per-pixel intensity modulation — same as boar's intensity_map
+            intensity_mod = np.clip(
+                1.0 + 0.35 * gaussian_filter(rng.standard_normal((self.H, self.W)),
+                                            sigma=self.S * 0.08),
+                0.3, 1.5
+            )
+            mask += stripe * intensity_mod * gauss(rng, 1.0, 0.15, lo=0.5, hi=1.3)
+
+        mask *= along_weight
+
+        # Debris: sparse soil/crop pixels inside the damage zone
+        debris = gaussian_filter(
+            (rng.random((self.H, self.W)) > gauss(rng, 0.82, 0.05,
+                                                lo=0.7, hi=0.93)).astype(float),
+            sigma=self.S * 0.008
+        )
+        mask += debris * (mask / (mask.max() + 1e-9)) * gauss(rng, 0.25, 0.08,
+                                                            lo=0.05, hi=0.45)
+
+        return np.clip(mask, 0, 1)
 
     def storm (self):
         print(self.ndvi_array.shape)
