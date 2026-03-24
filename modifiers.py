@@ -25,6 +25,7 @@ class DegradationEvent:
 
 
 
+
 class NDVIdecreaseSimulator:
 
     ALTITUDE_SCALE = 0.5 # multiplier for radius/ size params. Higher we are -> smaller effect we can see
@@ -85,7 +86,7 @@ class NDVIdecreaseSimulator:
     def result(self) -> np.ndarray:
         return self.ndvi_array
 
-    def _generate_mask (self, cause: str, rng: np.random.Generator) -> np.ndarray:
+    def _generate_mask(self, cause: str, rng: np.random.Generator) -> np.ndarray:
         """
         Args:
             cause::[str]
@@ -161,17 +162,78 @@ class NDVIdecreaseSimulator:
         mask = np.exp(-((dist - noise * r * warp_strength) / (r * 0.4))**2)
         return np.clip(mask, 0, 1)
 
+    def _mask_storm(self, rng):
+
+        angle = rng.uniform(0, 2*np.pi)
+
+        cx, cy = self._cx_cy(rng, margin=0.1)
+
+        Y, X = np.ogrid[:self.shape[0], :self.shape[1]]
+
+        along = (X - cx) * np.cos(angle) + (Y - cy) * np.sin(angle)
+        perp = -(X - cx) * np.sin(angle) + (Y - cy) * np.cos(angle)
+
+        corners = np.array([
+            [0 - cx,        0 - cy],
+            [self.shape[1] - cx,   0 - cy],
+            [0 - cx,        self.shape[0] - cy],
+            [self.shape[1] - cx,   self.shape[0] - cy],
+        ])
+
+        corners_along = corners[:,0] * np.cos(angle) + corners[:,1] * np.sin(angle)
+        diag = float(np.abs(corners_along).max())
+
+        length = gauss(rng, 0.5 * diag, 0.1 * diag, lo=0.3 * diag, hi=0.8 * diag)
+        along_weight = np.exp(-(along / (length * 0.55))**2)
+
+        noise_coarse = gaussian_filter(rng.standard_normal(self.shape),
+                            sigma=self.S * 0.10)
+
+        noise_fine   = gaussian_filter(rng.standard_normal(self.shape),
+                                    sigma=self.S * 0.025)
+
+        n_stripes = int(gauss(rng, 3, 1, lo=2, hi=5))
+
+        field_half = gauss(rng, 0.35 * self.S, 0.05 * self.S,
+                        lo=0.2 * self.S, hi=0.75 * self.S)
+
+        centers    = np.linspace(-field_half, field_half, n_stripes)
+        centers   += rng.normal(0, 0.03 * self.S, size=n_stripes)
+
+        mask = np.zeros(self.shape, dtype=np.float32)
+        for c in centers:
+            r = gauss(rng, 0.04 * self.S, 0.008 * self.S, lo=0.012 * self.S, hi=0.07 * self.S)
+
+            warp_coarse = gauss(rng, 0.6, 0.12, lo=0.2, hi=1.0)
+            warp_fine = gauss(rng, 0.25, 0.08, lo=0.05, hi=0.5)
+
+            perp_warped = (perp - c) - (noise_coarse * r * warp_coarse + noise_fine * r * warp_fine)
+
+            stripe = np.exp(-((perp_warped) / (r * 0.4))**2)
+
+            intensity_mod = np.clip(
+                1. + 0.35 * gaussian_filter(rng.standard_normal(self.shape), sigma=self.S * 0.08),
+                0.3, 1.5
+            )
+
+            mask += stripe * intensity_mod * gauss(rng, 1.0, 0.15, lo=0.5, hi=1.3)
+
+        mask *= along_weight
+
+        debris = gaussian_filter(
+            (rng.random(self.shape) > gauss(rng, 0.82, 0.05,
+                                                lo=0.7, hi=0.93)).astype(float),
+            sigma=self.S * 0.008
+        )
+
+        mask += debris * (mask/ (mask.max() + 1e-9)) * gauss(rng, 0.25, 0.1, lo=0.08, hi=0.45)
+
+        return np.clip(mask, 0, 1)
 
 
-    def boars (self):
-        print(self.ndvi_array.ndim)
-    # dziki ryjace w polu i niszczace je, mysle, ze na zasadzie pedzla (wielkosc do ustalenia) ktory znaczaco obniza NDVI
-    # w danym miejscu + pewnie jakas sciezka od boku pola. do pomyslenia czy jakos symulujemy zachowania stada czy pojedyncze dziki
 
-    def storm (self):
-        print(self.ndvi_array.shape)
-    # burza niszczaca pole poprzez mocne wiatry (?)
-    # znisczenie poprzez rozmyty duzy pedzel chyba
+
+
     
     def drought (self):
         print(self.ndvi_array)
