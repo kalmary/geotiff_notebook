@@ -4,16 +4,14 @@
 2. Dopisz w odpowiednich miejscach brakujące metody:
     [
         "wild_boar", "storm", "flooding", "drought", "frost",
-        "pest_infestation", "fungal_disease", "machinery_tracks",
-        "irrigation_failure", "herbicide_drift", "fertilizer_burn",
-        "deer_grazing", "fire", "compaction", "salinization"
+        "pest_infestation", "fungal_disease"
     ] - same deklaracje, bez konkretnej treści. Jeśli jakaś modyfikacja Ci się nie podoba/ uważasz, że jest zbyt rzadka, nie dodawaj jej.
 
 3. Poczytaj jak wyglądają wybrane modyfikacje NDVI - najlepiej jeśli zdobędziesz jakieś obrazkowe przykłady
 4. Napisz kod do testowania modifiers.py:
 4.1 Niech wczyta dowolny plik .tif
 4.2 Niech wybierze tylko ndvi
-4.3 Użyj naszej klasy do modyfikacji indeksu z wykorzystaniem metody odpowiadającej za dziki (podpowiedź - potrzebujesz metody, których używa zwykły użytkownik tej klasy - nie osoba, która pisze samą klasę)
+4.3 Użyj naszej klasy do modyfikacji indeksu z wykorzystaniem metody odpowiadającej za burzę (podpowiedź - potrzebujesz metody, których używa zwykły użytkownik tej klasy - nie osoba, która pisze samą klasę)
 4.4 Zastanów się jak wydobyć z klasy zmodyfikowany rezultat - dodałem odpowiednią metodę, która do tego służy.
 4.5 Zrób wykres, który przedstawi nasz wynik.
 
