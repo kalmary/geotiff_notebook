@@ -9,30 +9,51 @@ from loader import load_data
 from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
-from modifiers import NDVIdecrease
+from modifiers import NDVIdecreaseSimulator, DegradationEvent
 
 def main():
 
-    # print(type(load_data))
+# print(type(load_data))
     # gen = load_data('data', '.tif')
     # print(gen)
+    for dataset in load_data(source_dir="data", extension=".tif"):
+        ndvi = dataset.read(1)
+        decrease_simulator = NDVIdecreaseSimulator(ndvi_array=ndvi)
 
-    for dataset in load_data('data', '.tif'):
-        array = dataset.read(1)
-        nodata = dataset.nodata
-        array = np.where(array == nodata, np.nan, array) 
+        #decrease_simulator.apply(DegradationEvent(cause="boars", seed=42, count=10 , intensity=0.4))
+        decrease_simulator.apply(DegradationEvent(cause="storm", seed=42, count=3 , intensity=0.4))
+        ndvi_mod = decrease_simulator.result
+
         plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
-        plt.imshow(np.where(np.isnan(array), -999, array), # this line prevents matplotlib from struggling when trying to display nan
+        plt.imshow(np.where(np.isnan(ndvi_mod), -999, ndvi_mod),
                 cmap='RdYlGn',
                 vmin=-1,
                 vmax=1)
         # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
-        
-        print (dataset)
 
         plt.show()
+        
+
+        
+
 
 if __name__ == "__main__":
     main()
 
     
+"""
+    for dataset in load_data('data', '.tif'):
+                array = dataset.read(1)
+                nodata = dataset.nodata
+                array = np.where(array == nodata, np.nan, array) 
+                plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
+                plt.imshow(np.where(np.isnan(array), -999, array), # this line prevents matplotlib from struggling when trying to display nan
+                        cmap='RdYlGn',
+                        vmin=-1,
+                        vmax=1)
+                # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
+                
+        print (dataset)
+
+        plt.show()
+"""

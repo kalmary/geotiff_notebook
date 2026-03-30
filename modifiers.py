@@ -99,8 +99,8 @@ class NDVIdecreaseSimulator:
                 2D array of floats between 0 and 1, with 1 indicating the affected area
         """
         dispatch = {
-            "boars": self._mask_boars
-            # "storm": self._mask_storm,
+            "boars": self._mask_boars,
+            "storm": self._mask_storm,
             # "drought": self._mask_drought,
             # "flooding": self._mask_flooding
         }
