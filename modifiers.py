@@ -187,10 +187,10 @@ class NDVIdecreaseSimulator:
         along_weight = np.exp(-(along / (length * 0.55))**2)
 
         noise_coarse = gaussian_filter(rng.standard_normal(self.shape),
-                            sigma=self.S * 0.10)
+                            sigma=self.S * 0.10 * self.ALTITUDE_SCALE)
 
         noise_fine   = gaussian_filter(rng.standard_normal(self.shape),
-                                    sigma=self.S * 0.025)
+                                    sigma=self.S * 0.025 * self.ALTITUDE_SCALE)
 
         n_stripes = int(gauss(rng, 3, 1, lo=2, hi=5))
 
@@ -202,7 +202,7 @@ class NDVIdecreaseSimulator:
 
         mask = np.zeros(self.shape, dtype=np.float32)
         for c in centers:
-            r = gauss(rng, 0.04 * self.S, 0.008 * self.S, lo=0.012 * self.S, hi=0.07 * self.S)
+            r = gauss(rng, 0.04 * self.S, 0.008 * self.S * self.ALTITUDE_SCALE, lo=0.012 * self.S, hi=0.07 * self.S)
 
             warp_coarse = gauss(rng, 0.6, 0.12, lo=0.2, hi=1.0)
             warp_fine = gauss(rng, 0.25, 0.08, lo=0.05, hi=0.5)
@@ -212,7 +212,7 @@ class NDVIdecreaseSimulator:
             stripe = np.exp(-((perp_warped) / (r * 0.4))**2)
 
             intensity_mod = np.clip(
-                1. + 0.35 * gaussian_filter(rng.standard_normal(self.shape), sigma=self.S * 0.08),
+                1. + 0.35 * gaussian_filter(rng.standard_normal(self.shape), sigma=self.S * 0.08) * self.ALTITUDE_SCALE,
                 0.3, 1.5
             )
 
@@ -223,7 +223,7 @@ class NDVIdecreaseSimulator:
         debris = gaussian_filter(
             (rng.random(self.shape) > gauss(rng, 0.82, 0.05,
                                                 lo=0.7, hi=0.93)).astype(float),
-            sigma=self.S * 0.008
+            sigma=self.S * 0.008 * self.ALTITUDE_SCALE
         )
 
         mask += debris * (mask/ (mask.max() + 1e-9)) * gauss(rng, 0.25, 0.1, lo=0.08, hi=0.45)
