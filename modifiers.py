@@ -101,8 +101,8 @@ class NDVIdecreaseSimulator:
         dispatch = {
             "boars": self._mask_boars,
             "storm": self._mask_storm,
-            # "drought": self._mask_drought,
-            # "flooding": self._mask_flooding
+            #"drought": self._mask_drought,
+            #"flood": self._mask_flood
         }
 
         return dispatch[cause](rng)
@@ -162,6 +162,7 @@ class NDVIdecreaseSimulator:
         mask = np.exp(-((dist - noise * r * warp_strength) / (r * 0.4))**2)
         return np.clip(mask, 0, 1)
 
+    # wydaje mi sie, ze w koncu ta burza niestety do wywalenia
     def _mask_storm(self, rng):
 
         angle = rng.uniform(0, 2*np.pi)
@@ -240,4 +241,5 @@ class NDVIdecreaseSimulator:
     # susza suszy 
     # obnizenie calego indeksu na polu, ale moze gradientowo tak, w czescie polnocnej bardziej niz
 
-    
+    def flood (self):
+        print(self.ndvi_array)
