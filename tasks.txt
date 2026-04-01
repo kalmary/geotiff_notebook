@@ -1,2 +1,22 @@
 2.04.2026
-    
+
+1. W utils.py (jednak tam, będzie porządek) napisz funkcję do obniżania rozdzielczości, wykorzystującą opencv Sama funkcja jest prosta, ale powinna zawierać logikę która:
+1.1 Będzie obniżać rozdzielczość o tę samą skalę (np. 2x), którą uznasz za dostateczną,
+1.2 Zachowa oryginalne proporcje obrazka
+1.3 Napisz krótką funkcję testową
+
+2. W DataAugmenter.py:
+2.1 Użyj loadera danych do ich wczytania. Wybierz ndvi
+2.2 Zaimportuj funkcję do obniżania rozdzielczości
+2.3 Obniż rozdzielczość danych
+2.4 Na pojedynczych obrazkach z niższą rozdzielczości zmodyfikuj ndvi i wyświetl je:
+2.4.1 Czy działa dostatecznie szybko? Może trzeba bardziej zmniejszyć rozdzielczość?
+2.4.2 Czy rezultat wygląda wiarygodnie? Może trzeba zwiększyć rozdzielczość albo pokminić nad parametrami?
+        *jeśli wynik jest zupełnie źle i nic nie da się z tym zrobić, zgłoś mi to
+2.5 Zastanów się jak można zmodyfikować obrazki które mamy wykorzystując dostępne funkcje (modifiers.py) - jeden obrazek w końcowej pętli można zmienić na wiele sposobów
+
+
+Może warto też pociąć obrazki na mniejsze prostokąty bez Nanów? (nieobowiązkowe, ale ułatwi pracę)
+
+
+
