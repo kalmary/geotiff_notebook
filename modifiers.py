@@ -233,7 +233,7 @@ class NDVIdecreaseSimulator:
 
     def _mask_drought(self, rng):
         Y, X = np.ogrid[:self.shape[0], :self.shape[1]]
-        n_epicentres = max(1, int(gauss(rng, 1.5, 0.6, lo=1, hi=3)))
+        n_epicentres = int(gauss(rng, 1.5, 0.6, lo=1, hi=3))
         mask = np.zeros((self.shape[0], self.shape[1]), dtype=np.float32)
 
         for _ in range(n_epicentres):
@@ -262,7 +262,7 @@ class NDVIdecreaseSimulator:
 
     def _mask_flooding(self, rng):
         Y, X = np.ogrid[:self.shape[0], :self.shape[1]]
-        n_pools = max(1, int(gauss(rng, 1.3, 0.5, lo=1, hi=3)))
+        n_pools = int(gauss(rng, 1.3, 0.5, lo=1, hi=3))
         mask = np.zeros((self.shape[0], self.shape[1]), dtype=np.float32)
 
         for _ in range(n_pools):
