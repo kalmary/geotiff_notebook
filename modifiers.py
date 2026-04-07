@@ -40,7 +40,12 @@ class NDVIdecreaseSimulator:
         )
 
         assert self.ndvi_array.ndim == 2, "ndvi_array must be 2-dimensional"
-        assert np.all((self.ndvi_array >= -1) & (self.ndvi_array <= 1)), "ndvi_array values must be between -1 and 1"
+        #assert np.all((self.ndvi_array >= -1) & (self.ndvi_array <= 1)), "ndvi_array values must be between -1 and 1"
+        # chat gpt kazal mi zmienic na ponizsze ...
+        valid = ~np.isnan(self.ndvi_array)
+        assert np.all(
+            (self.ndvi_array[valid] >= -1) & (self.ndvi_array[valid] <= 1)
+        ), "ndvi_array values must be between -1 and 1"
 
         self.original_ndvi = self.ndvi_array.copy()
         self.shape = self.ndvi_array.shape
@@ -101,8 +106,8 @@ class NDVIdecreaseSimulator:
         dispatch = {
             "boars": self._mask_boars,
             "storm": self._mask_storm,
-            #"drought": self._mask_drought,
-            #"flood": self._mask_flood
+            "drought": self._mask_drought,
+            "flood": self._mask_flooding
         }
 
         return dispatch[cause](rng)
@@ -147,8 +152,12 @@ class NDVIdecreaseSimulator:
 
         cx, cy = self._cx_cy(rng, margin=0.15) # random circle center, margin avoids edges
         
+        
         r = gauss(rng, 0.04 * self.S * self.ALTITUDE_SCALE,
-                       0.01 * self.S, lo=0.02 * self.S, hi=0.07 * self.S) # TODO so far values are made up. lo must be large enough to make decrease visible, hi must be small enough to avoid being huge, 0.04* self.S = 4% of picture size. 0.01* self.S ~ std of radius, so we get some variation in size of holes.
+                       0.01 * self.S, lo=0.1 * self.S, hi=0.7 * self.S) # TODO so far values are made up. lo must be large enough to make decrease visible, hi must be small enough to avoid being huge, 0.04* self.S = 4% of picture size. 0.01* self.S ~ std of radius, so we get some variation in size of holes.
+
+        # r = gauss(rng, 0.04 * self.S * self.ALTITUDE_SCALE,
+        #                0.01 * self.S, lo=0.02 * self.S, hi=0.07 * self.S) # TODO so far values are made up. lo must be large enough to make decrease visible, hi must be small enough to avoid being huge, 0.04* self.S = 4% of picture size. 0.01* self.S ~ std of radius, so we get some variation in size of holes.
 
         # Spatial noise field — smoothed so it warps at patch scale, not pixel
         noise = rng.standard_normal(self.shape)

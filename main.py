@@ -20,8 +20,7 @@ def main():
         ndvi = dataset.read(1)
         decrease_simulator = NDVIdecreaseSimulator(ndvi_array=ndvi)
 
-        #decrease_simulator.apply(DegradationEvent(cause="boars", seed=42, count=3, intensity=0.4))
-        decrease_simulator.apply(DegradationEvent(cause="storm", seed=42, count=3 , intensity=0.4))
+        decrease_simulator.apply(DegradationEvent(cause="boars", seed=42, count=3, intensity=0.4))
         ndvi_mod = decrease_simulator.result
 
         plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
