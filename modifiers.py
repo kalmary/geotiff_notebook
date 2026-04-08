@@ -133,43 +133,47 @@ class NDVIdecreaseSimulator:
 
     def _mask_boars(self, rng):
         """
-        1. pick random center point
-        2. generate noise field with shape of full array
-        3. blur the noise field - more regular look
-        4. use gaussian bell:
-        4.1 distance from circle center - noise modified by r and strength creates circle with 0-1 values with irregular edges 
+        One call = one boar group with 3–5 individual rooting patches.
+        All patches clustered around a shared group centre.
+        count in DegradationEvent controls how many independent groups appear.
 
-
-        Args:
-            rng::Generator
-                Random number generator with predefined seed
-
-        Returns:
-            mask::ndarray
-                2D array of floats between 0 and 1, with 1 indicating the affected area
+        Shared noise fields across all patches in the group — same underlying
+        soil/texture turbulence for the whole sounder's activity zone.
         """
+        # Group centre — all individual patches scatter around this
+        group_cx, group_cy = self._cx_cy(rng, margin=0.15)
 
+        # How spread out the rooting spots are within the group
+        scatter = gauss(rng, 0.025 * self.S, 0.015 * self.S,
+                        lo=0.01 * self.S, hi=0.05 * self.S)
 
-        cx, cy = self._cx_cy(rng, margin=0.15) # random circle center, margin avoids edges
-        
-        
-        r = gauss(rng, 0.04 * self.S * self.ALTITUDE_SCALE,
-                       0.01 * self.S, lo=0.1 * self.S, hi=0.7 * self.S) # TODO so far values are made up. lo must be large enough to make decrease visible, hi must be small enough to avoid being huge, 0.04* self.S = 4% of picture size. 0.01* self.S ~ std of radius, so we get some variation in size of holes.
+        # Shared noise — same spatial turbulence for all patches in this group
+        noise_coarse = gaussian_filter(rng.standard_normal(self.shape),
+                                    sigma=self.S * 0.04)
+        noise_fine   = gaussian_filter(rng.standard_normal(self.shape),
+                                    sigma=self.S * 0.01)
 
-        # r = gauss(rng, 0.04 * self.S * self.ALTITUDE_SCALE,
-        #                0.01 * self.S, lo=0.02 * self.S, hi=0.07 * self.S) # TODO so far values are made up. lo must be large enough to make decrease visible, hi must be small enough to avoid being huge, 0.04* self.S = 4% of picture size. 0.01* self.S ~ std of radius, so we get some variation in size of holes.
-
-        # Spatial noise field — smoothed so it warps at patch scale, not pixel
-        noise = rng.standard_normal(self.shape)
-        noise = gaussian_filter(noise, sigma=r * 0.4)
-
+        n_boars = rng.integers(2, 6)  # 3 to 5 inclusive
+        mask = np.zeros(self.shape, dtype=np.float32)
         Y, X = np.ogrid[:self.shape[0], :self.shape[1]]
-        dist = np.sqrt((X - cx)**2 + (Y - cy)**2)
 
-        # Warp boundary: the effective radius varies with noise
-        warp_strength = gauss(rng, 0.5, 0.1, lo=0.2, hi=0.8)
-        mask = np.exp(-((dist - noise * r * warp_strength) / (r * 0.4))**2)
-        return np.clip(mask, 0, 1)
+        for _ in range(n_boars):
+            cx = int(np.clip(rng.normal(group_cx, scatter),
+                            self.shape[1] * 0.05, self.shape[1] * 0.95))
+            cy = int(np.clip(rng.normal(group_cy, scatter),
+                            self.shape[0] * 0.05, self.shape[0] * 0.95))
+
+            r = gauss(rng, 0.04 * self.S * self.ALTITUDE_SCALE,
+                        0.01 * self.S, lo=0.01 * self.S, hi=0.07 * self.S)
+
+            dist = np.sqrt((X - cx)**2 + (Y - cy)**2)
+
+            warp_strength = gauss(rng, 0.5, 0.1, lo=0.2, hi=0.8)
+            noise = noise_coarse + 0.3 * noise_fine
+            patch = np.exp(-((dist - noise * r * warp_strength) / (r * 0.4))**2)
+            mask = np.clip(mask + patch, 0, 1)
+
+        return mask
 
     # wydaje mi sie, ze w koncu ta burza niestety do wywalenia
     def _mask_storm(self, rng):

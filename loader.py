@@ -17,10 +17,11 @@ def load_data (source_dir: str, extension: str):
     pattern = f"*{extension}"
 
     path_list = list(source_dir.glob(pattern))
+
     # print(path)
     # print(path.resolve())
     # print(list(path.iterdir()))
     for path in path_list:
         dataset = rio.open(path)
-        yield dataset
+        yield dataset, path
        
