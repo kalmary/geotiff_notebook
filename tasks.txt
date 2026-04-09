@@ -1,22 +1,42 @@
-2.04.2026
+9.04.2026
 
-1. W utils.py (jednak tam, będzie porządek) napisz funkcję do obniżania rozdzielczości, wykorzystującą opencv Sama funkcja jest prosta, ale powinna zawierać logikę która:
-1.1 Będzie obniżać rozdzielczość o tę samą skalę (np. 2x), którą uznasz za dostateczną,
-1.2 Zachowa oryginalne proporcje obrazka
-1.3 Napisz krótką funkcję testową
-
-2. W DataAugmenter.py:
-2.1 Użyj loadera danych do ich wczytania. Wybierz ndvi
-2.2 Zaimportuj funkcję do obniżania rozdzielczości
-2.3 Obniż rozdzielczość danych
-2.4 Na pojedynczych obrazkach z niższą rozdzielczości zmodyfikuj ndvi i wyświetl je:
-2.4.1 Czy działa dostatecznie szybko? Może trzeba bardziej zmniejszyć rozdzielczość?
-2.4.2 Czy rezultat wygląda wiarygodnie? Może trzeba zwiększyć rozdzielczość albo pokminić nad parametrami?
-        *jeśli wynik jest zupełnie źle i nic nie da się z tym zrobić, zgłoś mi to
-2.5 Zastanów się jak można zmodyfikować obrazki które mamy wykorzystując dostępne funkcje (modifiers.py) - jeden obrazek w końcowej pętli można zmienić na wiele sposobów
+Info
+1. Dziki mają zmienione wartości - są bliższe twoim, dziki w grupach są bliżej siebie
 
 
-Może warto też pociąć obrazki na mniejsze prostokąty bez Nanów? (nieobowiązkowe, ale ułatwi pracę)
+Zadania
+Ostatnio miałeś przetworzyć każdy plik i go splotować. Dzisiaj zmieniamy to zadanie:
+1.Zapisz każdy plik po przetworzeniu. Zrób to w trochę inny sposób niż na korkach:
+1.1 upewnij się, że w folderze data, utworzyłeś folder processed
+1.2 utwórz folder o nazwie takiej samej jak oryginalny plik, bez rozszerzenia (pathlib pomoże)
+1.3 w tym folderze zapisz oryginalny plik, zmodyfikowany plik i ich różnicę (to powielanie tych samych danych, ale będzie bardzo wygodne.
+      jeśli masz problemy z pamięcią, pomiń oryginalny plik). Pliki muszą mieć różne końcówki, np. _org, _mod, _diff.
+Struktura folderów powinna wyglądać tak:
 
+data/
+├── raw/
+│   ├── data0.tif
+│   ├── data1.tif
+│   ├── ...
+│   └── datan.tif
+└── processed/
+    ├── data0/
+    │   ├── data0_org.tif
+    │   ├── data0_mod.tif
+    │   └── data0_diff.tif
+    ├── data1/
+    │   ├── data0_org.tif
+    │   ├── data0_mod.tif
+    │   └── data0_diff.tif
+    ├── .../
+    │   ├── ...
+    │   ├── ...
+    │   └── ...
+    └── datan/
+        ├── datan_org.tif
+        ├── datan_mod.tif
+        └── datan_diff.tif
 
-
+2. Zmienił się trochę detector. Struktura jest identyczna jak w modifiers:
+2.1 Zrozum kod
+2.2 Napisz prosty kod testowy, który sprawdzi czy metoda oparta o threshold działa (czy nie ma bugów, wynik może być słaby). Splotuj wynik.
