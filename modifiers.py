@@ -144,8 +144,8 @@ class NDVIdecreaseSimulator:
         group_cx, group_cy = self._cx_cy(rng, margin=0.15)
 
         # How spread out the rooting spots are within the group
-        scatter = gauss(rng, 0.025 * self.S, 0.015 * self.S,
-                        lo=0.01 * self.S, hi=0.05 * self.S)
+        scatter = gauss(rng, 0.02 * self.S, 0.01 * self.S,
+                        lo=0.01 * self.S, hi=0.04 * self.S)
 
         # Shared noise — same spatial turbulence for all patches in this group
         noise_coarse = gaussian_filter(rng.standard_normal(self.shape),
@@ -163,8 +163,8 @@ class NDVIdecreaseSimulator:
             cy = int(np.clip(rng.normal(group_cy, scatter),
                             self.shape[0] * 0.05, self.shape[0] * 0.95))
 
-            r = gauss(rng, 0.04 * self.S * self.ALTITUDE_SCALE,
-                        0.01 * self.S, lo=0.01 * self.S, hi=0.07 * self.S)
+            r = gauss(rng, 0.03 * self.S * self.ALTITUDE_SCALE,
+                        0.02 * self.S, lo=0.01 * self.S, hi=0.05 * self.S)
 
             dist = np.sqrt((X - cx)**2 + (Y - cy)**2)
 

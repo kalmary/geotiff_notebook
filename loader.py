@@ -7,8 +7,9 @@
 
 from pathlib import Path
 import rasterio as rio
+from tqdm import tqdm
 
-def load_data (source_dir: str, extension: str):
+def load_data (source_dir: str, extension: str, verbose: bool = False):
     source_dir = Path(source_dir)
 
     if not source_dir.exists():
@@ -17,6 +18,8 @@ def load_data (source_dir: str, extension: str):
     pattern = f"*{extension}"
 
     path_list = list(source_dir.glob(pattern))
+    if verbose:
+        path_list = tqdm(path_list, total=len(path_list), desc="File iteration")
 
     # print(path)
     # print(path.resolve())

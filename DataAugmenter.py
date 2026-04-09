@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from modifiers import NDVIdecreaseSimulator, DegradationEvent
+from tqdm import tqdm
 
 
 def process_dataset(dataset, scale=0.5):
@@ -43,21 +44,9 @@ def augment_ndvi(ndvi: np.ndarray):
     key = np.random.choice(methods_keys)
     count = np.random.randint(methods[key][1][0], methods[key][1][1])
 
-    print(f"Applying {methods[key][0]} with count={count}")
-
     sim1 = NDVIdecreaseSimulator(ndvi.copy())
     sim1.apply(DegradationEvent(cause=methods[key][0], seed=42, count=count, intensity=1.0))
 
-
-    # # przykład 2: susza
-    # sim2 = NDVIdecreaseSimulator(ndvi.copy())
-    # sim2.apply(DegradationEvent(cause=methods[key][0], seed=42, count=methods[key][1][1], intensity=0.7))
-    # results.append(("drought", sim2.result))
-
-    # # przykład 3: powodz
-    # sim3 = NDVIdecreaseSimulator(ndvi.copy())
-    # sim3.apply(DegradationEvent(cause=methods[key][0], seed=42, count=methods[key][1][2], intensity=0.8))
-    # results.append(("flood", sim3.result))
 
     return sim1.result
 
@@ -86,20 +75,24 @@ def visualize(results: np.ndarray):
 def main():
     data_dir = pth.Path("data/")
 
-    for dataset, path in load_data(data_dir / "raw", ".tif"):
+
+
+    for dataset, path in load_data(data_dir / "raw", ".tif", verbose=True):
+        data_dir_curr = data_dir.joinpath(f"processed/{path.stem}")
+        data_dir_curr.mkdir(parents=True, exist_ok=True)
 
         ndvi_lowres = process_dataset(dataset, scale=0.5)
-
         results = augment_ndvi(ndvi_lowres)
+        diff = ndvi_lowres - results
 
-        file_name = data_dir.joinpath("processed")
-        print(path.stem)
-        file_name_aug = file_name.joinpath(path.stem + "_augmented.tif")
-        file_name_diff = file_name.joinpath(path.stem + "_diff.tif")
+        file_name_org = data_dir_curr.joinpath(path.stem + "_org.tif")
+        file_name_aug = data_dir_curr.joinpath(path.stem + "_mod.tif")
+        file_name_diff = data_dir_curr.joinpath(path.stem + "_diff.tif")
 
-
+        save_augmented_image(ndvi_lowres, file_name_org)
         save_augmented_image(results, file_name_aug)
-        save_augmented_image(ndvi_lowres - results, file_name_diff)
+        save_augmented_image(diff, file_name_diff)
+
 
 
 

@@ -16,7 +16,7 @@ def main():
 # print(type(load_data))
     # gen = load_data('data', '.tif')
     # print(gen)
-    for dataset in load_data(source_dir="data", extension=".tif"):
+    for dataset in load_data(source_dir="data", extension=".tif", verbose=True):
         ndvi = dataset.read(1)
         decrease_simulator = NDVIdecreaseSimulator(ndvi_array=ndvi)
 
