@@ -92,6 +92,11 @@ def main():
         save_augmented_image(ndvi_lowres, file_name_org)
         save_augmented_image(results, file_name_aug)
         save_augmented_image(diff, file_name_diff)
+# tak zeby miec podglad co sie dzieje
+        visualize(ndvi_lowres)
+        visualize(results)
+        visualize(diff)
+
 
 
 
