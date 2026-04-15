@@ -39,4 +39,4 @@ data/
 
 2. Zmienił się trochę detector. Struktura jest podobna jak w modifiers:
 2.1 Zrozum kod
-2.2 Napisz prosty kod testowy, który sprawdzi czy metoda oparta o threshold działa (czy nie ma bugów, wynik może być słaby). Splotuj wynik.
+2.2 Napisz prosty kod testowy, który sprawdzi czy metoda oparta o threshold działa. Splotuj wynik.

@@ -4,12 +4,11 @@
 # 2.3 W def main() wywołaj funkcję load_data - funkcja musi działać w pętli. Splotuj ndvi (tak jak ostatnio) kolejno dla każdego kolejnego wykresu. 
 #     Z gwiazdką: wykresy muszą pokazać się wszystkie naraz (który element odpowiada za ich wyświetlanie?)
 
-import loader
-from loader import load_data
+from utils import load_data
 from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
-from modifiers import NDVIdecreaseSimulator, DegradationEvent
+from Modifiers import NDVIdecreaseSimulator, DegradationEvent
 
 def main():
 

@@ -1,13 +1,13 @@
 # DataAugmenter.py
 import pathlib as pth
-from loader import load_data
+from utils import load_data, save_img
 from utils import downsample_image_nan_safe
 import tifffile as tiff
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from modifiers import NDVIdecreaseSimulator, DegradationEvent
+from Modifiers import NDVIdecreaseSimulator, DegradationEvent
 from tqdm import tqdm
 
 
@@ -50,13 +50,6 @@ def augment_ndvi(ndvi: np.ndarray):
 
     return sim1.result
 
-def save_augmented_image(image: np.ndarray, filename):
-    """
-    Save augmented image to file (e.g. for later use or to avoid showing all images at once)
-    """
-
-    tiff.imwrite(filename, image.astype(np.float32))
-
 def visualize(results: np.ndarray):
     """
     Show original + augmented images
@@ -89,11 +82,12 @@ def main():
         file_name_aug = data_dir_curr.joinpath(path.stem + "_mod.tif")
         file_name_diff = data_dir_curr.joinpath(path.stem + "_diff.tif")
 
-        save_augmented_image(ndvi_lowres, file_name_org)
-        save_augmented_image(results, file_name_aug)
-        save_augmented_image(diff, file_name_diff)
+        save_img(ndvi_lowres, file_name_org)
+        save_img(results, file_name_aug)
+        save_img(diff, file_name_diff)
+        
 # tak zeby miec podglad co sie dzieje
-        visualize(ndvi_lowres)
+        visualize(ndvi_lowres) # TODO usuń to
         visualize(results)
         visualize(diff)
 

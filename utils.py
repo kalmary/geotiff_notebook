@@ -7,6 +7,10 @@
 
 import numpy as np
 import cv2
+from pathlib import Path
+import rasterio as rio
+from tqdm import tqdm
+import tifffile as tiff
 
 
 def downsample_image_nan_safe(image: np.ndarray, scale: float = 0.5) -> np.ndarray:
@@ -92,26 +96,31 @@ def test_downsample():
 
     plt.show()
 
+def load_data (source_dir: str, extension: str, verbose: bool = False):
+    source_dir = Path(source_dir)
 
-if __name__ == "__main__":
-    test_downsample()
+    if not source_dir.exists():
+        raise FileNotFoundError(f"Folder {source_dir} nie istnieje")
+    
+    pattern = f"*{extension}"
 
-# import numpy as np
-# import cv2 
+    path_list = list(source_dir.glob(pattern))
+    if verbose:
+        path_list = tqdm(path_list, total=len(path_list), desc="File iteration")
 
-# def downsample_img(data: np.ndarray, factor: int) -> np.ndarray:
+    # print(path)
+    # print(path.resolve())
+    # print(list(path.iterdir()))
+    for path in path_list:
+        dataset = rio.open(path)
+        yield dataset, path
 
-#     # data: 2D -> data.shape == (height, width)
-#     # data: 3D -> data.shape == (channels, height, width)
-#     # data 3D -> data.shape == (n_imgs, height, width)
+def save_img(image: np.ndarray, filename):
+    """
+    Save augmented image to file (e.g. for later use or to avoid showing all images at once)
+    """
 
-#     if data.ndim == 2:
-#         return data[::factor, ::factor]
-#     else:
-#         return data[..., ::factor, ::factor]
-
-# img0 = np.random.rand(100, 100)
-# img1 = cv2.resize(img0, (50, 50))
+    tiff.imwrite(filename, image.astype(np.float32))
 
 
 

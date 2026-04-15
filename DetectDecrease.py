@@ -13,15 +13,15 @@ That's the only "parameter" and it has a direct statistical meaning.
 """
 
 import numpy as np
-from typing import Optional, Tuple, Literal
-from skimage.morphology import remove_small_objects, closing, disk
+import pathlib as pth
+from typing import Literal, Union
 import rasterio as rio
 from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
 
 @dataclass
 class DetectorMethod:
-    method: Literal["threshold"]
+    method: Literal["threshold", "sauvola", "msglof"]
     cfg: dict = field(default_factory=dict)
 
 
@@ -30,21 +30,224 @@ class Detector:
         self._method = method
 
     def _detect_threshold(self, data: np.ndarray, valid: np.ndarray, cfg: dict) -> np.ndarray:
+        from skimage.morphology import remove_small_objects, closing, disk
+
         threshold = float(valid.mean() - float(cfg["k"]) * valid.std())
         mask = (data < threshold) & ~np.isnan(data)
-        # mask = closing(mask, disk(3))
-        # mask = remove_small_objects(mask, max_size=20)
+        mask = closing(mask, disk(3))
+        mask = remove_small_objects(mask, max_size=20)
         return mask
+    
+    def _detect_sauvola(self, data: np.ndarray, valid: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
+        """
+        Sauvola's local thresholding method.
+
+        cfg keys:
+            win_frac  (float, default 0.05)  window size as fraction of min(H, W)
+            k         (float, default 0.2)   threshold offset
+            r         (float, default 0.5)   dynamic range scaling
+        """
+
+        from skimage.filters import threshold_sauvola
+
+        nan_mask = np.isnan(data)
+        filled = np.where(nan_mask, np.nanmean(data), data)
+
+        win = max(15, int(min(data.shape) * cfg["win_frac"]))
+        if win % 2 == 0:
+            win += 1
+
+        thresh_map = threshold_sauvola(filled, window_size=win,
+                                    k=cfg["k"], r=cfg["r"])
+        return (filled < thresh_map) & ~nan_mask
+    
+    def _detect_msglof(self, data: np.ndarray, valid: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
+        """
+        Multi-Scale Graph-refined Local Outlier Factor (MS-GLOF).
+
+        Per-pixel feature vector: [mean, std] at 3 window scales + gradient
+        magnitude + local NDVI rank. LOF run per tile (tile_size x tile_size
+        with overlap), scores stitched via Gaussian-weighted blending to avoid
+        tile boundary artefacts. Spatial graph post-processing suppresses
+        isolated false positives by dropping connected components whose mean
+        LOF score or pixel count falls below thresholds.
+
+        Reference: Breunig et al. (2000) LOF: Identifying Density-Based
+        Local Outliers. SIGMOD.
+
+        cfg keys:
+            tile_size        (int,   default 256)   tile side in pixels
+            overlap          (int,   default 32)    overlap between tiles
+            n_neighbors      (int,   default 20)    LOF k
+            contamination    (float, default 0.1)   expected outlier fraction
+            scales           (list,  default [0.02, 0.05, 0.10])
+                                                    window sizes as fraction of
+                                                    min(H, W)
+            min_cluster_size (int,   default 50)    min px per retained component
+            min_cluster_score(float, default 1.5)   min mean LOF score per component
+        """
+        from sklearn.neighbors import LocalOutlierFactor
+        from scipy.ndimage import uniform_filter, generic_filter, label
+        from scipy.ndimage import sobel
+
+        nan_mask = np.isnan(data)
+        filled = np.where(nan_mask, np.nanmean(data), data)
+
+        H, W = filled.shape
+        short = min(H, W)
+
+        # --- 1. Multi-scale feature map (H, W, n_features) ---
+        scales = cfg.get("scales", [0.02, 0.05, 0.10])
+        feat_maps = []
+
+        for s in scales:
+            win = max(3, int(short * s))
+            if win % 2 == 0:
+                win += 1
+            mu = uniform_filter(filled, size=win)
+            # std via E[X²] - E[X]²
+            sq_mu = uniform_filter(filled ** 2, size=win)
+            std = np.sqrt(np.clip(sq_mu - mu ** 2, 0, None))
+            feat_maps.extend([mu, std])
+
+        # gradient magnitude
+        gx = sobel(filled, axis=1)
+        gy = sobel(filled, axis=0)
+        grad = np.hypot(gx, gy)
+        feat_maps.append(grad)
+
+        # local rank: percentile of pixel within its neighbourhood
+        win_rank = max(3, int(short * scales[1]))
+        if win_rank % 2 == 0:
+            win_rank += 1
+
+        def _rank(patch):
+            c = patch[len(patch) // 2]
+            return np.mean(patch <= c)
+
+        rank_map = generic_filter(filled, _rank, size=win_rank)
+        feat_maps.append(rank_map)
+
+        features = np.stack(feat_maps, axis=-1)  # (H, W, F)
+
+        # --- 2. Tile-based LOF with Gaussian-weighted blending ---
+        tile_size = cfg.get("tile_size", 256)
+        overlap   = cfg.get("overlap",   32)
+        n_neighbors   = cfg.get("n_neighbors",   20)
+        contamination = cfg.get("contamination", 0.1)
+        stride = tile_size - overlap
+
+        score_acc  = np.zeros((H, W), dtype=np.float32)
+        weight_acc = np.zeros((H, W), dtype=np.float32)
+
+        # Gaussian kernel for overlap blending
+        lin = np.linspace(-1, 1, tile_size)
+        gx_k, gy_k = np.meshgrid(lin, lin)
+        gauss = np.exp(-(gx_k ** 2 + gy_k ** 2) / (2 * 0.5 ** 2)).astype(np.float32)
+
+        ys = list(range(0, H - tile_size + 1, stride))
+        xs = list(range(0, W - tile_size + 1, stride))
+        if not ys or ys[-1] + tile_size < H:
+            ys.append(max(0, H - tile_size))
+        if not xs or xs[-1] + tile_size < W:
+            xs.append(max(0, W - tile_size))
+
+        for y0 in ys:
+            y1 = min(y0 + tile_size, H)
+            for x0 in xs:
+                x1 = min(x0 + tile_size, W)
+                tile_feat = features[y0:y1, x0:x1]          # (th, tw, F)
+                th, tw    = tile_feat.shape[:2]
+                tile_nan  = nan_mask[y0:y1, x0:x1].ravel()
+
+                X = tile_feat.reshape(-1, tile_feat.shape[-1])
+                valid_idx = np.where(~tile_nan)[0]
+
+                if len(valid_idx) < n_neighbors + 1:
+                    continue
+
+                X_valid = X[valid_idx]
+                lof = LocalOutlierFactor(
+                    n_neighbors=n_neighbors,
+                    contamination=contamination,
+                    novelty=False,
+                )
+                lof.fit(X_valid)
+                # negative_outlier_factor_: more negative = more anomalous
+                raw_scores = -lof.negative_outlier_factor_  # (n_valid,)
+
+                tile_scores = np.zeros(th * tw, dtype=np.float32)
+                tile_scores[valid_idx] = raw_scores.astype(np.float32)
+                tile_scores = tile_scores.reshape(th, tw)
+
+                g = gauss[:th, :tw]
+                score_acc[y0:y1, x0:x1]  += tile_scores * g
+                weight_acc[y0:y1, x0:x1] += g
+
+        with np.errstate(invalid="ignore", divide="ignore"):
+            score_map = np.where(weight_acc > 0, score_acc / weight_acc, 0.0)
+
+        # LOF threshold: contamination quantile
+        valid_scores = score_map[~nan_mask]
+        threshold = np.quantile(valid_scores, 1.0 - contamination)
+        raw_mask = (score_map > threshold) & ~nan_mask
+
+        # --- 3. Spatial graph refinement ---
+        min_cluster_size  = cfg.get("min_cluster_size",  50)
+        min_cluster_score = cfg.get("min_cluster_score", 1.5)
+
+        labeled, n_components = label(raw_mask)
+        refined = np.zeros_like(raw_mask)
+
+        for comp_id in range(1, n_components + 1):
+            comp = labeled == comp_id
+            if comp.sum() < min_cluster_size:
+                continue
+            mean_score = score_map[comp].mean()
+            if mean_score < min_cluster_score:
+                continue
+            refined |= comp
+
+        return refined
+
 
     def _generate_mask(self, data: np.ndarray, valid: np.ndarray) -> np.ndarray:
         dispatch = {
-            "threshold": self._detect_threshold
+            "threshold": self._detect_threshold,
+            "sauvola": self._detect_sauvola,
+            "msglof": self._detect_msglof
         }
         return dispatch[self._method.method](data, valid, self._method.cfg)
 
     def apply(self, data: np.ndarray) -> np.ndarray:
         valid = data[~np.isnan(data)]
         return self._generate_mask(data, valid)
+
+def save_masks(data: Union[str, pth.Path]):
+    methods = ["threshold", "sauvola", "msglof"]
+
+    data = pth.Path(data).joinpath('processed')
+
+    for folder in data.iterdir():
+        for file in folder.glob('*.tif'):
+            if "_mod" not in file.stem:
+                continue
+
+            dataset = rio.open(file)
+
+            data = dataset.read(1)
+
+            # nodata -> NaN
+            if data.nodata is not None:
+                ndvi = np.where(ndvi == data.nodata, np.nan, ndvi)
+
+            del data, dataset
+
+            for method in methods:
+                # TODO dla każdej metody zapisz array z maską do tiffa. tiff ma się znaleźć w folderze analogicznym do pliku źródłowego. końcówka _mask.tif
+
+
+
     
 def test_threshold_detector():
 
