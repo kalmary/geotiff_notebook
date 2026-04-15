@@ -29,16 +29,17 @@ class Detector:
     def __init__(self, method: DetectorMethod):
         self._method = method
 
-    def _detect_threshold(self, data: np.ndarray, valid: np.ndarray, cfg: dict) -> np.ndarray:
+    def _detect_threshold(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         from skimage.morphology import remove_small_objects, closing, disk
 
+        valid = data[~np.isnan(data)]
         threshold = float(valid.mean() - float(cfg["k"]) * valid.std())
         mask = (data < threshold) & ~np.isnan(data)
         mask = closing(mask, disk(3))
         mask = remove_small_objects(mask, max_size=20)
         return mask
     
-    def _detect_sauvola(self, data: np.ndarray, valid: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
+    def _detect_sauvola(self, data: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
         """
         Sauvola's local thresholding method.
 
@@ -61,7 +62,7 @@ class Detector:
                                     k=cfg["k"], r=cfg["r"])
         return (filled < thresh_map) & ~nan_mask
     
-    def _detect_msglof(self, data: np.ndarray, valid: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
+    def _detect_msglof(self, data: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
         """
         Multi-Scale Graph-refined Local Outlier Factor (MS-GLOF).
 
@@ -97,7 +98,7 @@ class Detector:
         short = min(H, W)
 
         # --- 1. Multi-scale feature map (H, W, n_features) ---
-        scales = cfg.get("scales", [0.02, 0.05, 0.10])
+        scales = cfg["scales"]
         feat_maps = []
 
         for s in scales:
@@ -131,10 +132,10 @@ class Detector:
         features = np.stack(feat_maps, axis=-1)  # (H, W, F)
 
         # --- 2. Tile-based LOF with Gaussian-weighted blending ---
-        tile_size = cfg.get("tile_size", 256)
-        overlap   = cfg.get("overlap",   32)
-        n_neighbors   = cfg.get("n_neighbors",   20)
-        contamination = cfg.get("contamination", 0.1)
+        tile_size = cfg["tile_size"]
+        overlap   = cfg["overlap"]
+        n_neighbors   = cfg["n_neighbors"]
+        contamination = cfg["contamination"]
         stride = tile_size - overlap
 
         score_acc  = np.zeros((H, W), dtype=np.float32)
@@ -147,6 +148,7 @@ class Detector:
 
         ys = list(range(0, H - tile_size + 1, stride))
         xs = list(range(0, W - tile_size + 1, stride))
+
         if not ys or ys[-1] + tile_size < H:
             ys.append(max(0, H - tile_size))
         if not xs or xs[-1] + tile_size < W:
@@ -193,8 +195,8 @@ class Detector:
         raw_mask = (score_map > threshold) & ~nan_mask
 
         # --- 3. Spatial graph refinement ---
-        min_cluster_size  = cfg.get("min_cluster_size",  50)
-        min_cluster_score = cfg.get("min_cluster_score", 1.5)
+        min_cluster_size  = cfg["min_cluster_size"]
+        min_cluster_score = cfg["min_cluster_score"]
 
         labeled, n_components = label(raw_mask)
         refined = np.zeros_like(raw_mask)
@@ -211,20 +213,26 @@ class Detector:
         return refined
 
 
-    def _generate_mask(self, data: np.ndarray, valid: np.ndarray) -> np.ndarray:
+    def _generate_mask(self, data: np.ndarray) -> np.ndarray:
         dispatch = {
             "threshold": self._detect_threshold,
             "sauvola": self._detect_sauvola,
             "msglof": self._detect_msglof
         }
-        return dispatch[self._method.method](data, valid, self._method.cfg)
+        return dispatch[self._method.method](data, self._method.cfg)
 
     def apply(self, data: np.ndarray) -> np.ndarray:
-        valid = data[~np.isnan(data)]
-        return self._generate_mask(data, valid)
+        
+        return self._generate_mask(data)
 
 def save_masks(data: Union[str, pth.Path]):
-    methods = ["threshold", "sauvola", "msglof"]
+    methods = {
+        "threshold": {"k": 2.0},
+        "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
+        "msglof": {"tile_size": 256, "overlap": 32, "n_neighbors": 20,
+                   "contamination": 0.1, "scales": [0.02, 0.05, 0.10],
+                   "min_cluster_size": 50, "min_cluster_score": 1.5}
+    }
 
     data = pth.Path(data).joinpath('processed')
 
@@ -243,8 +251,9 @@ def save_masks(data: Union[str, pth.Path]):
 
             del data, dataset
 
-            for method in methods:
-                # TODO dla każdej metody zapisz array z maską do tiffa. tiff ma się znaleźć w folderze analogicznym do pliku źródłowego. końcówka _mask.tif
+            for method, cfg in methods.items():
+                pass
+                # TODO dla każdej metody zapisz array z maską do tiffa. tiff ma się znaleźć w folderze analogicznym do pliku źródłowego. końcówka _mask_{method}.tif
 
 
 
