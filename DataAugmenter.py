@@ -1,6 +1,6 @@
 # DataAugmenter.py
 import pathlib as pth
-from utils import load_data, save_img
+from utils import load_data, save_tiff
 from utils import downsample_image_nan_safe
 
 import numpy as np
@@ -73,7 +73,7 @@ class NDVIdecreaseSimulator:
                 Returns itself so calls can be chained
 
         """
-        
+
         rng = np.random.default_rng(event.seed) # random generator with fixed seed - guesses are deterministic in another runs
         total_mask = np.zeros(self.shape, dtype=float) # mask with full zeros
 
@@ -372,6 +372,8 @@ def visualize(results: np.ndarray):
 
 
 def main():
+    import matplotlib.pyplot as plt
+
     data_dir = pth.Path("data/")
 
 
@@ -381,20 +383,41 @@ def main():
         data_dir_curr.mkdir(parents=True, exist_ok=True)
 
         ndvi_lowres = process_dataset(dataset, scale=0.5)
+        plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
+        plt.imshow(np.where(np.isnan(ndvi_lowres), -999, ndvi_lowres),
+                cmap='RdYlGn',
+                vmin=-1,
+                vmax=1)
+        # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
+
+        plt.show()
+
+
         results = augment_ndvi(ndvi_lowres)
         diff = ndvi_lowres - results
 
-        file_name_org = data_dir_curr.joinpath(path.stem + "_org.tif")
-        file_name_aug = data_dir_curr.joinpath(path.stem + "_mod.tif")
-        file_name_diff = data_dir_curr.joinpath(path.stem + "_diff.tif")
+        results = {
+            "ndvi": ndvi_lowres,
+            "augmented": results,
+            "diff": diff}
 
-        save_img(ndvi_lowres, file_name_org)
-        save_img(results, file_name_aug)
-        save_img(diff, file_name_diff)
+        file_name = data_dir_curr.joinpath(path.stem + "_mod.tif")
+        
+        save_tiff(file_name,
+                  results,
+                  dataset.transform,
+                  dataset.crs)
 
-
-
-
+        for key, result in results.items():
+            plt_path = data_dir_curr.joinpath(path.stem + f"_{key}.png")
+            plt.figure(figsize=(8,5))
+            plt.title(key)
+            plt.imshow(np.where(np.isnan(result), -999, result),
+                    cmap='RdYlGn',
+                    vmin=-1,
+                    vmax=1)
+            plt.colorbar()
+            plt.savefig(plt_path, dpi=300, bbox_inches = "tight")
 
 
 

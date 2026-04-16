@@ -7,10 +7,13 @@
 
 import numpy as np
 import cv2
-from pathlib import Path
+import pathlib as pth
 import rasterio as rio
 from tqdm import tqdm
 import tifffile as tiff
+import rasterio
+from typing import Union
+
 
 
 def downsample_image_nan_safe(image: np.ndarray, scale: float = 0.5) -> np.ndarray:
@@ -96,8 +99,8 @@ def test_downsample():
 
     plt.show()
 
-def load_data(source_dir: str, extension: str, verbose: bool = False):
-    source_dir = Path(source_dir)
+def load_data(source_dir: str, extension: str = "tif", verbose: bool = False):
+    source_dir = pth.Path(source_dir)
 
     if not source_dir.exists():
         raise FileNotFoundError(f"Folder {source_dir} nie istnieje")
@@ -105,6 +108,7 @@ def load_data(source_dir: str, extension: str, verbose: bool = False):
     pattern = f"*{extension}"
 
     path_list = list(source_dir.glob(pattern))
+
     if verbose:
         path_list = tqdm(path_list, total=len(path_list), desc="File iteration")
 
@@ -115,12 +119,22 @@ def load_data(source_dir: str, extension: str, verbose: bool = False):
         dataset = rio.open(path)
         yield dataset, path
 
-def save_img(image: np.ndarray, filename):
+def save_tiff(path: Union[str, pth.Path], arrays: dict[str, np.ndarray], transform, crs):
     """
-    Save augmented image to file (e.g. for later use or to avoid showing all images at once)
+    arrays: {"ndvi": ndvi_data, "labels": labels_data, ...}
     """
-
-    tiff.imwrite(filename, image.astype(np.float32))
-
-
-
+    first = next(iter(arrays.values()))
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=first.shape[0],
+        width=first.shape[1],
+        count=len(arrays),
+        dtype=first.dtype,
+        crs=crs,
+        transform=transform,
+    ) as dst:
+        for i, (name, arr) in enumerate(arrays.items(), start=1):
+            dst.write(arr, i)
+            dst.update_tags(i, name=name)  # band name as tag

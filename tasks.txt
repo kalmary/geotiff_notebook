@@ -1,42 +1,9 @@
-9.04.2026
+16.04.26
 
-Info
-1. Dziki mają zmienione wartości - są bliższe twoim, dziki w grupach są bliżej siebie
-
-
-Zadania
-Ostatnio miałeś przetworzyć każdy plik i go splotować. Dzisiaj zmieniamy to zadanie:
-1.Zapisz każdy plik po przetworzeniu. Zrób to w trochę inny sposób niż na korkach:
-1.1 upewnij się, że w folderze data, utworzyłeś folder processed
-1.2 utwórz folder o nazwie takiej samej jak oryginalny plik, bez rozszerzenia (pathlib pomoże)
-1.3 w tym folderze zapisz oryginalny plik, zmodyfikowany plik i ich różnicę (to powielanie tych samych danych, ale będzie bardzo wygodne.
-      jeśli masz problemy z pamięcią, pomiń oryginalny plik). Pliki muszą mieć różne końcówki, np. _org, _mod, _diff.
-Struktura folderów powinna wyglądać tak:
-
-data/
-├── raw/
-│   ├── data0.tif
-│   ├── data1.tif
-│   ├── ...
-│   └── datan.tif
-└── processed/
-    ├── data0/
-    │   ├── data0_org.tif
-    │   ├── data0_mod.tif
-    │   └── data0_diff.tif
-    ├── data1/
-    │   ├── data0_org.tif
-    │   ├── data0_mod.tif
-    │   └── data0_diff.tif
-    ├── .../
-    │   ├── ...
-    │   ├── ...
-    │   └── ...
-    └── datan/
-        ├── datan_org.tif
-        ├── datan_mod.tif
-        └── datan_diff.tif
-
-2. Zmienił się trochę detector. Struktura jest podobna jak w modifiers:
-2.1 Zrozum kod
-2.2 Napisz prosty kod testowy, który sprawdzi czy metoda oparta o threshold działa. Splotuj wynik.
+1. Przejrzyj kod sporo rzeczy się zmieniło - zapisujemy low res, mod i diff do jednego tiffa (channel 0, 1, 2)
+2. Użyj augmentacji danych i przetwórz pliki
+3. Użyj detectora:
+    zapisz do pliku .npy (najłatwiejszy format do dalszej pracy) macierz z ndvi i nałożoną maską - tam gdzie wykryto zniszczenie, ma być 1
+4. dobierz parametry detectora tak aby wyniki były poprawne (jak umawialiśmy się na zajęciach - threshold    musi działać nieco słabiej)
+5. Zastanów się nad pętlą która w Evaluation będzie wczytywała pliki .npy i dataset.read(2) (różnicę), a następnie obliczy statystyki dokładności.
+5.1 Wykresy chcemy zapisać jako obrazki .png a wyniki tekstowe do pliku .txt albo .json (wybierz).

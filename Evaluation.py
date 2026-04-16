@@ -43,4 +43,3 @@ def get_recall(mask: np.ndarray, ground_truth: np.ndarray) -> float:
 
 
 
-

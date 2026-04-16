@@ -22,7 +22,7 @@ def main():
         decrease_simulator.apply(DegradationEvent(cause="boars", seed=42, count=3, intensity=0.4))
         ndvi_mod = decrease_simulator.result
 
-        plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
+        plt.figure(figsize=(16,10)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
         plt.imshow(np.where(np.isnan(ndvi_mod), -999, ndvi_mod),
                 cmap='RdYlGn',
                 vmin=-1,
