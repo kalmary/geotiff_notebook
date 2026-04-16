@@ -253,7 +253,7 @@ def save_masks(data: Union[str, pth.Path]):
 
             for method, cfg in methods.items():
                 pass
-                # TODO dla każdej metody zapisz array z maską do tiffa. tiff ma się znaleźć w folderze analogicznym do pliku źródłowego. końcówka _mask_{method}.tif
+                # TODO do każdej zapisz obraz z maską. tym razem niech to będzie plik .npy (numpy.save(data, path))
 
 
 
