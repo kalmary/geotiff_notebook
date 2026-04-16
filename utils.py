@@ -96,7 +96,7 @@ def test_downsample():
 
     plt.show()
 
-def load_data (source_dir: str, extension: str, verbose: bool = False):
+def load_data(source_dir: str, extension: str, verbose: bool = False):
     source_dir = Path(source_dir)
 
     if not source_dir.exists():
