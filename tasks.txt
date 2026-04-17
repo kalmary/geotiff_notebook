@@ -3,8 +3,8 @@
 1. Przejrzyj kod sporo rzeczy się zmieniło - zapisujemy low res, mod i diff do jednego tiffa (channel 0, 1, 2)
 2. Użyj augmentacji danych i przetwórz pliki
 3. Użyj detectora:
-    zapisz do pliku .npy (najłatwiejszy format do dalszej pracy) macierz z ndvi i nałożoną maską - tam gdzie wykryto zniszczenie, ma być 1
+    zapisz do pliku .tiff (tego który zawiera low_res, aug i diff) macierz z ndvi i nałożoną maską - tam gdzie wykryto zniszczenie. (channel 1)
 4. dobierz parametry detectora tak aby wyniki były poprawne (jak umawialiśmy się na zajęciach - threshold    musi działać nieco słabiej)
-5. Zastanów się nad pętlą która w Evaluation będzie wczytywała pliki .npy i dataset.read(2) (różnicę), a następnie obliczy statystyki dokładności.
+5. Zastanów się nad pętlą która w Evaluation będzie wczytywała pliki .tiff dataset.read(1) (mod) i dataset.read(2) (różnicę), a następnie obliczy statystyki dokładności.
 5.1 Wykresy chcemy zapisać jako obrazki .png a wyniki tekstowe do pliku .txt albo .json (wybierz).
-5.2 NIE PATRZ NA CLUSTERING.PY
+5.2 NIE PATRZ NA DATA_CLUSTERING.PY

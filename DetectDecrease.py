@@ -253,7 +253,7 @@ def save_masks(data: Union[str, pth.Path]):
 
             for method, cfg in methods.items():
                 pass
-                # TODO do każdej zapisz obraz z maską. tym razem niech to będzie plik .npy (numpy.save(data, path))
+                # TODO do każdej zapisz obraz z maską. funkcja save_tiff z utils umożliwi Ci rozszerzenie pliku z _mod w nazwie o kolejny kanał
 
 
 

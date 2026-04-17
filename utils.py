@@ -120,21 +120,30 @@ def load_data(source_dir: str, extension: str = "tif", verbose: bool = False):
         yield dataset, path
 
 def save_tiff(path: Union[str, pth.Path], arrays: dict[str, np.ndarray], transform, crs):
-    """
-    arrays: {"ndvi": ndvi_data, "labels": labels_data, ...}
-    """
-    first = next(iter(arrays.values()))
+    path = pth.Path(path)
+
+    if path.exists():
+        with rasterio.open(path) as src:
+            existing = {}
+            for i in range(1, src.count + 1):
+                tag = src.tags(i).get("name", f"band_{i}")
+                existing[tag] = src.read(i)
+            # new arrays overwrite existing bands with the same name
+            merged = existing | arrays
+    else:
+        merged = arrays
+
+    first = next(iter(merged.values()))
     with rasterio.open(
-        path,
-        "w",
+        path, "w",
         driver="GTiff",
         height=first.shape[0],
         width=first.shape[1],
-        count=len(arrays),
+        count=len(merged),
         dtype=first.dtype,
         crs=crs,
         transform=transform,
     ) as dst:
-        for i, (name, arr) in enumerate(arrays.items(), start=1):
+        for i, (name, arr) in enumerate(merged.items(), start=1):
             dst.write(arr, i)
-            dst.update_tags(i, name=name)  # band name as tag
+            dst.update_tags(i, name=name)
