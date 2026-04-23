@@ -206,31 +206,34 @@ def main():
             "leaf_size": 40
         },
     }
-    folders = []
-    for folder in data_folder.iterdir():
-        if not folder.is_dir():
-            continue
-        folders.append(folder)
+    data = pth.Path(data).joinpath('processed')
 
-    pbar = tqdm(folders, total=len(folders), desc="Processing folders")
+    file_list = list(data.rglob('*.tif'))
+    file_list = [f for f in file_list if '_mask' in f.name]
 
-    for folder in pbar:
-        for dataset, path in load_data(folder, extension="tif", verbose=False):
-            # TODO w datasecie ma być maska 0 1 z detectorów
-            # TODO clustering ma pracować na tej masce
-            data = dataset.read(1) 
+    pbar = tqdm(file_list, total=len(file_list), desc="Processing files")
 
-            for key, cfg in methods.items():
-                detector = Detector(ClusterMethod(method=key, cfg=cfg))
-                labels, bboxes = detector.apply(data)
+    for file in pbar:
+        tiff_dir = file.parent
+        plots_dir = file.parent.parent.joinpath('plots')
 
-                # save labels
-                out_path = path.parent / f"{path.stem}_cluster_{key}"
+        for method, cfg in methods.items():
+
+            detector = Detector(ClusterMethod(method=method, cfg=cfg))
+
+            dataset = rio.open(file)
+            data = dataset.read(1)
+
+            if dataset.nodata is not None:
+                ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
+
+            labels, bboxes = detector.apply(data)
 
 
-                # plot clusters
-                plot_clusters(data, labels, path=out_path.with_suffix(".png"))
-                plot_bbox(data, bboxes, path=out_path.with_suffix("_bbox.png"))
+
+            # plot clusters
+            plot_clusters(data, labels, path=plots_dir / f"{file.stem}_clusters_{method}.png")
+            plot_bbox(data, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")
 
                 
 

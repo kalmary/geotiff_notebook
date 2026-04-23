@@ -354,7 +354,7 @@ def augment_ndvi(ndvi: np.ndarray):
     sim1.apply(DegradationEvent(cause=methods[key][0], seed=42, count=count, intensity=1.0))
 
 
-    return sim1.result
+    return sim1.result, count, methods[key]
 
 def visualize(results: np.ndarray):
     """
@@ -382,10 +382,16 @@ def main():
         data_dir_curr = data_dir.joinpath(f"processed/{path.stem}")
         data_dir_curr.mkdir(parents=True, exist_ok=True)
 
+        tiff_dir = data_dir_curr.joinpath("tiff")
+        tiff_dir.mkdir(parents=True, exist_ok=True)
+
+        plots_dir = data_dir_curr.joinpath("plots")
+        plots_dir.mkdir(parents=True, exist_ok=True)
+
         ndvi_lowres = process_dataset(dataset, scale=0.5)
         plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
 
-        results = augment_ndvi(ndvi_lowres)
+        results, count, cause = augment_ndvi(ndvi_lowres)
         diff = ndvi_lowres - results
 
         results = {
@@ -393,15 +399,17 @@ def main():
             "augmented": results,
             "diff": diff}
 
-        file_name = data_dir_curr.joinpath(path.stem + "_mod.tif")
         
-        save_tiff(file_name,
-                  results,
+        
+        for key, result in results.items():
+            file_name = tiff_dir.joinpath(path.stem + f"_{key}.tif")
+
+            save_tiff(file_name,
+                  {key: result},
                   dataset.transform,
                   dataset.crs)
 
-        for key, result in results.items():
-            plt_path = data_dir_curr.joinpath(path.stem + f"_{key}.png")
+            plt_path = plots_dir.joinpath(path.stem + f"_{key}.png")
             plt.figure(figsize=(8,5))
             plt.title(key)
             plt.imshow(np.where(np.isnan(result), -999, result),
@@ -411,6 +419,10 @@ def main():
             plt.colorbar()
             plt.savefig(plt_path, dpi=300, bbox_inches = "tight")
 
+
+            # save key to txt
+            with open(data_dir_curr.joinpath("degradation.txt"), "w") as f:
+                f.write(f"cause: {cause[0]}, count: {count}")
 
 
 

@@ -18,6 +18,8 @@ from typing import Literal, Union
 import rasterio as rio
 from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
+from utils import save_tiff
+from tqdm import tqdm
 
 @dataclass
 class DetectorMethod:
@@ -90,6 +92,7 @@ class Detector:
         from sklearn.neighbors import LocalOutlierFactor
         from scipy.ndimage import uniform_filter, generic_filter, label
         from scipy.ndimage import sobel
+
 
         nan_mask = np.isnan(data)
         filled = np.where(nan_mask, np.nanmean(data), data)
@@ -225,6 +228,28 @@ class Detector:
         
         return self._generate_mask(data)
 
+def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
+    own_fig = ax is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+    display_ndvi = np.where(np.isnan(ndvi), -999, ndvi)
+    ax.imshow(display_ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
+
+    overlay = np.where(mask, 1.0, np.nan)
+    ax.imshow(overlay, cmap="Reds", alpha=0.5, vmin=0, vmax=1)
+
+    ax.axis("off")
+
+    if own_fig:
+        plt.tight_layout()
+        if path is not None:
+            fig.savefig(path, dpi=300, bbox_inches="tight")
+        else:
+            plt.show()
+        plt.close(fig)
+
+
 def save_masks(data: Union[str, pth.Path]):
     methods = {
         "threshold": {"k": 2.0},
@@ -236,83 +261,37 @@ def save_masks(data: Union[str, pth.Path]):
 
     data = pth.Path(data).joinpath('processed')
 
-    for folder in data.iterdir():
-        for file in folder.glob('*.tif'):
-            if "_mod" not in file.stem:
-                continue
+    file_list = list(data.rglob('*.tif'))
+    file_list = [f for f in file_list if '_augmented' in f.name]
+
+    pbar = tqdm(file_list, total=len(file_list), desc="Processing files")
+
+    for file in pbar:
+        tiff_dir = file.parent
+        plots_dir = file.parent.parent.joinpath('plots')
+
+        for method, cfg in methods.items():
+
+            detector = Detector(DetectorMethod(method=method, cfg=cfg))
 
             dataset = rio.open(file)
+            ndvi = dataset.read(1)
 
-            data = dataset.read(1)
+            if dataset.nodata is not None:
+                ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
 
-            # nodata -> NaN
-            if data.nodata is not None:
-                ndvi = np.where(ndvi == data.nodata, np.nan, ndvi)
+            mask = detector.apply(ndvi)
 
-            del data, dataset
-
-            for method, cfg in methods.items():
-                pass
-                # TODO do każdej zapisz obraz z maską. funkcja save_tiff z utils umożliwi Ci rozszerzenie pliku z _mod w nazwie o kolejny kanał
-
-
-
-    
-def test_threshold_detector():
-
-    # --- 1. Tworzymy sztuczne NDVI ---
-    rng = np.random.default_rng(42)
-
-    ndvi = rng.uniform(0.4, 0.9, (200, 200))  # zdrowa roślinność
-
-    # --- 2. Dodajemy "uszkodzenia" ---
-    ndvi[80:120, 80:120] -= 0.5   # silna degradacja
-    ndvi[30:50, 150:180] -= 0.3   # mniejsza degradacja
-
-    # --- 3. Dodajemy NaNy ---
-    ndvi[0:20, 0:20] = np.nan
-
-    # bezpieczeństwo zakresu NDVI
-    ndvi = np.clip(ndvi, -1.0, 1.0)
-
-    # --- 4. Uruchamiamy detector ---
-    detector = Detector(
-        DetectorMethod(method="threshold", cfg={"k": 2.0})
-    )
-
-    mask = detector.apply(ndvi)
-
-    # --- 5. Debug info ---
-    valid = ndvi[~np.isnan(ndvi)]
-    threshold = valid.mean() - 2.0 * valid.std()
-
-    print(f"Mean NDVI: {valid.mean():.3f}")
-    print(f"Std NDVI: {valid.std():.3f}")
-    print(f"Threshold: {threshold:.3f}")
-    print(f"Detected pixels: {mask.sum()}")
-
-    # --- 6. Wizualizacja ---
-    plt.figure(figsize=(12, 4))
-
-    plt.subplot(1, 3, 1)
-    plt.title("NDVI")
-    plt.imshow(np.where(np.isnan(ndvi), -999, ndvi),
-               cmap="RdYlGn", vmin=-1, vmax=1)
-
-    plt.subplot(1, 3, 2)
-    plt.title("Mask (threshold)")
-    plt.imshow(mask, cmap="gray")
-
-    plt.subplot(1, 3, 3)
-    plt.title("Overlay")
-    overlay = np.where(mask, 1, 0)
-    plt.imshow(np.where(np.isnan(ndvi), -999, ndvi),
-               cmap="RdYlGn", vmin=-1, vmax=1)
-    plt.imshow(overlay, cmap="Reds", alpha=0.4)
-
-    plt.tight_layout()
-    plt.show()
+            save_tiff(
+                tiff_dir / f"{file.stem}_mask_{method}.tif",
+                {"mask": mask.astype(np.uint8)},
+                dataset.transform,
+                dataset.crs
+            )
+            
+            # plot mask + ndvi
+            plot_mask(mask, ndvi, path=plots_dir / f"{file.stem}_mask_{method}.png") # TODO pliki zapisuja sie do jednego folderu - napraw
 
 
 if __name__ == "__main__":
-    test_threshold_detector()
+    save_masks("data")

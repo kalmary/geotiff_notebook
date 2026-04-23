@@ -41,5 +41,6 @@ def get_recall(mask: np.ndarray, ground_truth: np.ndarray) -> float:
 
 
 
-
+def evaluate_results(data_path: Union[pth.Path, str]) -> None:
+    
 
