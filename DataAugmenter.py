@@ -384,14 +384,6 @@ def main():
 
         ndvi_lowres = process_dataset(dataset, scale=0.5)
         plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
-        plt.imshow(np.where(np.isnan(ndvi_lowres), -999, ndvi_lowres),
-                cmap='RdYlGn',
-                vmin=-1,
-                vmax=1)
-        # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
-
-        plt.show()
-
 
         results = augment_ndvi(ndvi_lowres)
         diff = ndvi_lowres - results
