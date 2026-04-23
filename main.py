@@ -8,7 +8,7 @@ from utils import load_data
 from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
-from Modifiers import NDVIdecreaseSimulator, DegradationEvent
+from DataAugmenter import NDVIdecreaseSimulator, DegradationEvent
 
 def main():
 
