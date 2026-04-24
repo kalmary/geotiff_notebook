@@ -428,9 +428,51 @@ def augment_data(path: Optional[Union[str, pth.Path]]) -> None:
             with open(data_dir_curr.joinpath("degradation.txt"), "w") as f:
                 f.write(f"cause: {cause[0]}, count: {count}")
 
+def test_augmentation():
+    import rasterio as rio
+    # load single file and test it
+    path = pth.Path("data/raw/wrzaca 418 2025-06-26-ORTHO-NDVI.data.tif")
+    dataset = rio.open(path)
+    ndvi = dataset.read(1)
 
+    if dataset.nodata is not None:
+        ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
+
+    ndvi_lowres = downsample_image_nan_safe(ndvi, scale=0.5)
+
+    sim = NDVIdecreaseSimulator(ndvi_lowres.copy())
+    sim.apply(DegradationEvent(cause="boars", seed=42, count=5, intensity=0.8))
+
+    results = sim.result
+    difference = ndvi_lowres - results
+
+    plt.figure(figsize=(15,5))
+    plt.subplot(1,3,1)
+    plt.title("Original NDVI")
+    plt.imshow(np.where(np.isnan(ndvi_lowres), -999, ndvi_lowres),
+            cmap='RdYlGn',
+            vmin=-1,
+            vmax=1)
+    plt.colorbar()
+    plt.subplot(1,3,2)
+    plt.title(f"Augmented NDVI\nCause: {cause[0]}, Count: {count}")
+    plt.imshow(np.where(np.isnan(results), -999, results),
+            cmap='RdYlGn',
+            vmin=-1,
+            vmax=1)
+    plt.colorbar()
+    plt.subplot(1,3,3)
+    plt.title("Difference")
+    plt.imshow(np.where(np.isnan(difference), -999, difference),
+            cmap='RdYlGn',
+            vmin=-1,
+            vmax=1)
+    plt.colorbar()
+    plt.tight_layout()
+    plt.show()
+    
 
 
 
 if __name__ == "__main__":
-    augment_data("data")
+    test_augmentation()

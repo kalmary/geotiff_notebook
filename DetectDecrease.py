@@ -41,7 +41,7 @@ class Detector:
         mask = remove_small_objects(mask, max_size=20)
         return mask
     
-    def _detect_sauvola(self, data: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
+    def _detect_sauvola(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         """
         Sauvola's local thresholding method.
 
@@ -64,7 +64,7 @@ class Detector:
                                     k=cfg["k"], r=cfg["r"])
         return (filled < thresh_map) & ~nan_mask
     
-    def _detect_msglof(self, data: np.ndarray, cfg: dict) -> np.ndarray: # TODO wyjaśnij
+    def _detect_msglof(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         """
         Multi-Scale Graph-refined Local Outlier Factor (MS-GLOF).
 
@@ -234,12 +234,12 @@ def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
         fig, ax = plt.subplots(figsize=(8, 6))
 
     display_ndvi = np.where(np.isnan(ndvi), -999, ndvi)
-    ax.imshow(display_ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
+    im = ax.imshow(display_ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
 
     overlay = np.where(mask, 1.0, np.nan)
     ax.imshow(overlay, cmap="Blues", alpha=0.75, vmin=0, vmax=1)
 
-    ax.axis("off")
+    plt.colorbar(im, ax=ax, label="NDVI")
 
     if own_fig:
         plt.tight_layout()
@@ -291,9 +291,22 @@ def detect_decrease(data: Union[str, pth.Path]):
                 dataset.crs
             )
             
-            # plot mask + ndvi
-            plot_mask(mask, ndvi, path=plots_dir_method / f"{file.stem}_mask_{method}.png") # TODO pliki zapisuja sie do jednego folderu - napraw
+            plot_mask(mask, ndvi, path=plots_dir_method / f"{file.stem}_mask_{method}.png")
 
+
+def test_detector():
+    # Simple test with single file loaded
+    path = "data/processed/2017.tif"
+    dataset = rio.open(path)
+    ndvi = dataset.read(1)
+
+    if dataset.nodata is not None:
+        ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
+
+    detector = Detector(DetectorMethod(method="threshold", cfg={"k": 2.0}))
+    mask = detector.apply(ndvi)
+
+    plot_mask(mask, ndvi)
 
 if __name__ == "__main__":
-    detect_decrease("data")
+    test_detector()
