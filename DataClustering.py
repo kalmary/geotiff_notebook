@@ -44,7 +44,7 @@ class Detector:
 
     def _kmeans(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         from sklearn.cluster import KMeans
-        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, KMeans, range(1, 25))
+        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, KMeans, range(1, 8))
 
         model = KMeans(n_clusters=cfg["n_clusters"], **cfg.get("kwargs", {}))
         labels = model.fit_predict(data)
@@ -60,14 +60,14 @@ class Detector:
     
     def _agglomerative(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         from sklearn.cluster import AgglomerativeClustering
-        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, AgglomerativeClustering, range(1, 25))
+        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, AgglomerativeClustering, range(1, 8))
         model = AgglomerativeClustering(n_clusters=cfg["n_clusters"], **cfg.get("kwargs", {}))
         labels = model.fit_predict(data)
         return labels
     
     def _spectral(self, data, cfg: dict) -> np.ndarray:
         from sklearn.cluster import SpectralClustering
-        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, SpectralClustering, range(1, 25))
+        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, SpectralClustering, range(1, 8))
         cfg["n_jobs"] = self.n_jobs
         model = SpectralClustering(n_clusters=cfg["n_clusters"], **cfg.get("kwargs", {}))
         labels = model.fit_predict(data)
@@ -110,6 +110,25 @@ class Detector:
 
         labels = np.full(mask.shape, -1, dtype=int)
         labels[rows, cols] = self._generate_cluster(xy).ravel()
+
+        bboxes = self._get_bbox(labels)
+        return labels, bboxes
+
+    def apply_downsampled(self, mask: np.ndarray, scale: float = 0.25) -> tuple[np.ndarray, dict]:
+        import cv2
+        orig_h, orig_w = mask.shape
+        new_w, new_h = int(orig_w * scale), int(orig_h * scale)
+
+        small_mask = cv2.resize(
+            mask.astype(np.uint8), (new_w, new_h), interpolation=cv2.INTER_NEAREST
+        ).astype(bool)
+
+        small_labels, _ = self.apply(small_mask)
+
+        labels = cv2.resize(
+            small_labels.astype(np.int32), (orig_w, orig_h), interpolation=cv2.INTER_NEAREST
+        ).astype(int)
+        labels[~mask] = -1
 
         bboxes = self._get_bbox(labels)
         return labels, bboxes
@@ -171,11 +190,11 @@ def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str,
 
 
 
-def main():
+def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
     import pathlib as pth
     from utils import load_data
     from tqdm import tqdm
-    data_path = pth.Path("data")
+    data_path = pth.Path(path)
 
     methods = {
         "KMeans": {
@@ -237,7 +256,7 @@ def main():
                 
 
 if __name__ == "__main__":
-    main()
+    cluster_data("data")
 
 
         

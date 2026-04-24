@@ -351,7 +351,7 @@ def augment_ndvi(ndvi: np.ndarray):
     }
 
     methods_keys = list(methods.keys())
-    key = np.random.choice(methods_keys)
+    key = np.random.choice(methods_keys, p=[0.40, 0.30, 0.30]) # prob distribution for methods, boars should be slightly more common than drought and flood
     count = np.random.randint(methods[key][1][0], methods[key][1][1])
 
     sim1 = NDVIdecreaseSimulator(ndvi.copy())
@@ -375,10 +375,10 @@ def visualize(results: np.ndarray):
     plt.show()
 
 
-def main():
+def augment_data(path: Optional[Union[str, pth.Path]]) -> None:
     import matplotlib.pyplot as plt
 
-    data_dir = pth.Path("data/")
+    data_dir = pth.Path(path)
 
 
 
@@ -433,4 +433,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    augment_data("data")

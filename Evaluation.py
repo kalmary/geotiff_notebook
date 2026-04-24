@@ -35,6 +35,7 @@ def get_miou(mask: np.ndarray, ground_truth: np.ndarray) -> float:
 
 def evaluate_results(data_path: Union[pth.Path, str]) -> None:
     data_path = pth.Path(data_path)
+    data_path = data_path.joinpath("processed")
 
     # load diff and binarize it
     # load mask
@@ -73,7 +74,7 @@ def evaluate_results(data_path: Union[pth.Path, str]) -> None:
             f.write(classification_report_str)
 
 if __name__ == "__main__":
-    evaluate_results("data/processed")
+    evaluate_results("data")
 
 
 

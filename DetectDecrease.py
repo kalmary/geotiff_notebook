@@ -237,7 +237,7 @@ def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
     ax.imshow(display_ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
 
     overlay = np.where(mask, 1.0, np.nan)
-    ax.imshow(overlay, cmap="Blues", alpha=0.5, vmin=0, vmax=1)
+    ax.imshow(overlay, cmap="Blues", alpha=0.75, vmin=0, vmax=1)
 
     ax.axis("off")
 
@@ -250,7 +250,7 @@ def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
         plt.close(fig)
 
 
-def save_masks(data: Union[str, pth.Path]):
+def detect_decrease(data: Union[str, pth.Path]):
     methods = {
         "threshold": {"k": 2.0},
         "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
@@ -296,4 +296,4 @@ def save_masks(data: Union[str, pth.Path]):
 
 
 if __name__ == "__main__":
-    save_masks("data")
+    detect_decrease("data")
