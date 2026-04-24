@@ -231,7 +231,7 @@ class Detector:
 def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
     own_fig = ax is None
     if own_fig:
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.subplots(figsize=(10, 10))
 
     display_ndvi = np.where(np.isnan(ndvi), -999, ndvi)
     im = ax.imshow(display_ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
@@ -296,14 +296,24 @@ def detect_decrease(data: Union[str, pth.Path]):
 
 def test_detector():
     # Simple test with single file loaded
-    path = "data/processed/2017.tif"
+    path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented.tif" # TODO: remember that file must be existing
+    path = pth.Path(path)
     dataset = rio.open(path)
     ndvi = dataset.read(1)
 
     if dataset.nodata is not None:
         ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
 
-    detector = Detector(DetectorMethod(method="threshold", cfg={"k": 2.0}))
+    curr_method_idx = 0
+    methods = {
+        "threshold": {"k": 2.0},
+        "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
+        "msglof": {"tile_size": 256, "overlap": 32, "n_neighbors": 20,
+                   "contamination": 0.1, "scales": [0.02, 0.05, 0.10],
+                   "min_cluster_size": 50, "min_cluster_score": 1.5}
+    }
+
+    detector = Detector(DetectorMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))
     mask = detector.apply(ndvi)
 
     plot_mask(mask, ndvi)

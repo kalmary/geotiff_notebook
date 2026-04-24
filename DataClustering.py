@@ -253,6 +253,51 @@ def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
             plot_clusters(mask, labels, path=plots_dir_method / f"{file.stem}_clusters_{method}.png")
             plot_bbox(mask, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")
 
+def test_clustering():
+    path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented_mask_threshold.tif" # TODO: remember that file must be existing
+    # TODO - worst testing, must be done for every detection method
+    path = pth.Path(path)
+    dataset = rio.open(path)
+    mask = dataset.read(1).astype(bool)
+
+    methods = {
+        "KMeans": {
+            "n_init": "auto", # int if not auto
+            "max_iter": 300,
+            "tol": 0.0001,
+            "random_state": 42,
+        },
+        "MeanShift": {
+            "min_bin_freq": 1,
+            "cluster_all": True,
+            "max_iter": 300
+        },
+        "AgglomerativeClustering": {
+            "metric": "euclidean",
+            "linkage": "ward",
+        },
+        "SpectralClustering": {
+            "n_init": 10,
+            "gamma": 1.0,
+            "affinity": "rbf",
+            "n_neighbors": 10,
+        },
+        "HDBSCAN": {
+            "min_cluster_size": 20,
+            "min_samples": None,
+            "cluster_selection_epsilon": 0.0,
+            "metric": "euclidean",
+            "alpha": 1.0,
+            "leaf_size": 40
+        },
+    }
+    curr_method_idx = 0
+    detector = Detector(ClusterMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))
+    labels, bboxes = detector.apply(mask)
+
+    plot_clusters(mask, labels)
+    plot_bbox(mask, bboxes)
+
                 
 
 if __name__ == "__main__":

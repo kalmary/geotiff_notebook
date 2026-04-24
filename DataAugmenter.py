@@ -345,17 +345,18 @@ def augment_ndvi(ndvi: np.ndarray):
     """
 
     methods = {
-        0: ("boars", [5, 10]),
-        1: ("drought", [1, 2]),
-        2: ("flood", [1, 3])
+        0: ("boars", [5, 10, 0.9]),
+        1: ("drought", [1, 2, 0.7]),
+        2: ("flood", [1, 3, 0.95])
     }
 
     methods_keys = list(methods.keys())
     key = np.random.choice(methods_keys, p=[0.40, 0.30, 0.30]) # prob distribution for methods, boars should be slightly more common than drought and flood
     count = np.random.randint(methods[key][1][0], methods[key][1][1])
+    intensity = methods[key][2] # use the intensity value from the methods dictionary
 
     sim1 = NDVIdecreaseSimulator(ndvi.copy())
-    sim1.apply(DegradationEvent(cause=methods[key][0], seed=42, count=count, intensity=1.0))
+    sim1.apply(DegradationEvent(cause=methods[key][0], seed=42, count=count, intensity=intensity))
 
 
     return sim1.result, count, methods[key]
@@ -441,7 +442,13 @@ def test_augmentation():
     ndvi_lowres = downsample_image_nan_safe(ndvi, scale=0.5)
 
     sim = NDVIdecreaseSimulator(ndvi_lowres.copy())
-    sim.apply(DegradationEvent(cause="boars", seed=42, count=5, intensity=0.8))
+    methods = {
+        0: ("boars", [5, 10, 0.9]),
+        1: ("drought", [1, 2, 0.7]),
+        2: ("flood", [1, 3, 0.95])
+    }
+    curr_cause_idx = 2
+    sim.apply(DegradationEvent(cause=cause[curr_cause_idx][0], seed=42, count=1, intensity=cause[curr_cause_idx][2]))
 
     results = sim.result
     difference = ndvi_lowres - results
@@ -455,7 +462,7 @@ def test_augmentation():
             vmax=1)
     plt.colorbar()
     plt.subplot(1,3,2)
-    plt.title(f"Augmented NDVI\nCause: {cause[0]}, Count: {count}")
+    plt.title(f"Augmented NDVI\nCause: {cause[curr_cause_idx][0]}, Count: 1, Intensity: {cause[curr_cause_idx][2]}")
     plt.imshow(np.where(np.isnan(results), -999, results),
             cmap='RdYlGn',
             vmin=-1,
