@@ -259,8 +259,10 @@ class NDVIdecreaseSimulator:
         for _ in range(n_epicentres):
             cx, cy = self._cx_cy(rng, margin=0.0)
 
-            rx    = gauss(rng, 0.35 * self.shape[1], 0.10 * self.shape[1], lo=0.15 * self.shape[1], hi=0.65 * self.shape[1])
-            ry    = gauss(rng, 0.30 * self.shape[0], 0.10 * self.shape[0], lo=0.12 * self.shape[0], hi=0.60 * self.shape[0])
+            rx    = gauss(rng, 0.15 * self.shape[1], 0.05 * self.shape[1],
+                          lo=0.06 * self.shape[1], hi=0.28 * self.shape[1])
+            ry    = gauss(rng, 0.12 * self.shape[0], 0.05 * self.shape[0],
+                          lo=0.05 * self.shape[0], hi=0.24 * self.shape[0])
             angle = rng.uniform(0, np.pi)
 
             dx = (X - cx) * np.cos(angle) + (Y - cy) * np.sin(angle)
@@ -284,35 +286,38 @@ class NDVIdecreaseSimulator:
         Y, X = np.ogrid[:self.shape[0], :self.shape[1]]
         n_pools = int(gauss(rng, 1.3, 0.5, lo=1, hi=3))
         mask = np.zeros((self.shape[0], self.shape[1]), dtype=np.float32)
-
+ 
         for _ in range(n_pools):
             cx, cy = self._cx_cy(rng, margin=0.05)
-
-            rx    = gauss(rng, 0.12 * self.shape[1], 0.04 * self.shape[1], lo=0.04 * self.shape[1], hi=0.25 * self.shape[1])
-            ry    = gauss(rng, 0.10 * self.shape[0], 0.04 * self.shape[0], lo=0.03 * self.shape[0], hi=0.22 * self.shape[0])
+ 
+            # slightly trimmed from original
+            rx    = gauss(rng, 0.09 * self.shape[1], 0.03 * self.shape[1],
+                          lo=0.03 * self.shape[1], hi=0.18 * self.shape[1])
+            ry    = gauss(rng, 0.08 * self.shape[0], 0.03 * self.shape[0],
+                          lo=0.025 * self.shape[0], hi=0.16 * self.shape[0])
             angle = rng.uniform(0, np.pi)
-
+ 
             dx = (X - cx) * np.cos(angle) + (Y - cy) * np.sin(angle)
             dy = -(X - cx) * np.sin(angle) + (Y - cy) * np.cos(angle)
-
+ 
             blob = np.exp(-(dx**2 / (2 * rx**2) + dy**2 / (2 * ry**2))).astype(np.float32)
-
+ 
             flat_threshold = gauss(rng, 0.35, 0.08, lo=0.15, hi=0.60)
             interior = np.clip((blob - flat_threshold) / (1.0 - flat_threshold), 0, 1)
-
+ 
             noise_shore = gaussian_filter(rng.standard_normal((self.shape[0], self.shape[1])),
-                                        sigma=self.S * 0.06 * self.ALTITUDE_SCALE)
+                                          sigma=self.S * 0.06 * self.ALTITUDE_SCALE)
             warp_strength = gauss(rng, 0.4, 0.1, lo=0.1, hi=0.7)
             blob_warped = blob - noise_shore * warp_strength * 0.15
             edge_zone = np.clip(np.clip(blob_warped, 0, 1) - interior, 0, 1)
-
+ 
             pool = (interior * gauss(rng, 0.9, 0.05, lo=0.7, hi=1.0) +
                     edge_zone * gauss(rng, 0.55, 0.1, lo=0.3, hi=0.8))
-
+ 
             noise_fine = gaussian_filter(rng.standard_normal((self.shape[0], self.shape[1])),
-                                        sigma=self.S * 0.03 * self.ALTITUDE_SCALE)
+                                         sigma=self.S * 0.03 * self.ALTITUDE_SCALE)
             mask += pool * np.clip(1.0 + 0.2 * noise_fine, 0.6, 1.4).astype(np.float32)
-
+ 
         return np.clip(mask, 0, 1)
 
 
