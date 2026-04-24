@@ -4,6 +4,8 @@ import numpy as np
 import os
 from typing import Optional, Union
 import pathlib as pth
+import rasterio as rio
+from tqdm import tqdm
 
 @dataclass
 class ClusterMethod:
@@ -102,12 +104,12 @@ class Detector:
             }
         return dispatch[self._method.method](data, self._method.cfg)
     
-    def apply(self, data: np.ndarray) -> tuple[np.ndarray, dict]:
-        valid_mask = ~np.isnan(data)
-        valid_data = data[valid_mask].reshape(-1, 1)
+    def apply(self, mask: np.ndarray) -> tuple[np.ndarray, dict]:
+        rows, cols = np.where(mask)
+        xy = np.column_stack([cols, rows])  # (N, 2) XY positions
 
-        labels = np.full(data.shape, -1, dtype=int)
-        labels[valid_mask] = self._generate_cluster(valid_data).ravel()
+        labels = np.full(mask.shape, -1, dtype=int)
+        labels[rows, cols] = self._generate_cluster(xy).ravel()
 
         bboxes = self._get_bbox(labels)
         return labels, bboxes
@@ -173,7 +175,7 @@ def main():
     import pathlib as pth
     from utils import load_data
     from tqdm import tqdm
-    data_folder = pth.Path("data/processed")
+    data_path = pth.Path("data")
 
     methods = {
         "KMeans": {
@@ -206,9 +208,9 @@ def main():
             "leaf_size": 40
         },
     }
-    data = pth.Path(data).joinpath('processed')
+    data_path = pth.Path(data_path).joinpath('processed')
 
-    file_list = list(data.rglob('*.tif'))
+    file_list = list(data_path.rglob('*.tif'))
     file_list = [f for f in file_list if '_mask' in f.name]
 
     pbar = tqdm(file_list, total=len(file_list), desc="Processing files")
@@ -218,22 +220,19 @@ def main():
         plots_dir = file.parent.parent.joinpath('plots')
 
         for method, cfg in methods.items():
+            detection_method = file.stem.rsplit("_")[-1]
+            plots_dir_method = plots_dir / detection_method
 
             detector = Detector(ClusterMethod(method=method, cfg=cfg))
 
-            dataset = rio.open(file)
-            data = dataset.read(1)
-
-            if dataset.nodata is not None:
-                ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
-
-            labels, bboxes = detector.apply(data)
-
-
+            with rio.open(file) as dataset:
+                mask = dataset.read(1).astype(bool)
+                
+            labels, bboxes = detector.apply(mask)
 
             # plot clusters
-            plot_clusters(data, labels, path=plots_dir / f"{file.stem}_clusters_{method}.png")
-            plot_bbox(data, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")
+            plot_clusters(mask, labels, path=plots_dir_method / f"{file.stem}_clusters_{method}.png")
+            plot_bbox(mask, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")
 
                 
 

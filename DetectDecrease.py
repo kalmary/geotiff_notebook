@@ -237,7 +237,7 @@ def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
     ax.imshow(display_ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
 
     overlay = np.where(mask, 1.0, np.nan)
-    ax.imshow(overlay, cmap="Reds", alpha=0.5, vmin=0, vmax=1)
+    ax.imshow(overlay, cmap="Blues", alpha=0.5, vmin=0, vmax=1)
 
     ax.axis("off")
 
@@ -262,7 +262,7 @@ def save_masks(data: Union[str, pth.Path]):
     data = pth.Path(data).joinpath('processed')
 
     file_list = list(data.rglob('*.tif'))
-    file_list = [f for f in file_list if '_augmented' in f.name]
+    file_list = [f for f in file_list if '_augmented' in f.name and '_mask' not in f.name]
 
     pbar = tqdm(file_list, total=len(file_list), desc="Processing files")
 
@@ -271,6 +271,8 @@ def save_masks(data: Union[str, pth.Path]):
         plots_dir = file.parent.parent.joinpath('plots')
 
         for method, cfg in methods.items():
+            plots_dir_method = plots_dir / method
+            plots_dir_method.mkdir(parents=True,exist_ok=True)
 
             detector = Detector(DetectorMethod(method=method, cfg=cfg))
 
@@ -290,7 +292,7 @@ def save_masks(data: Union[str, pth.Path]):
             )
             
             # plot mask + ndvi
-            plot_mask(mask, ndvi, path=plots_dir / f"{file.stem}_mask_{method}.png") # TODO pliki zapisuja sie do jednego folderu - napraw
+            plot_mask(mask, ndvi, path=plots_dir_method / f"{file.stem}_mask_{method}.png") # TODO pliki zapisuja sie do jednego folderu - napraw
 
 
 if __name__ == "__main__":

@@ -349,7 +349,6 @@ def augment_ndvi(ndvi: np.ndarray):
     key = np.random.choice(methods_keys)
     count = np.random.randint(methods[key][1][0], methods[key][1][1])
 
-    print(f"Applying {methods[key][0]} degradation, count: {count}")
     sim1 = NDVIdecreaseSimulator(ndvi.copy())
     sim1.apply(DegradationEvent(cause=methods[key][0], seed=42, count=count, intensity=1.0))
 
