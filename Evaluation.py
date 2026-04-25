@@ -6,7 +6,7 @@ from typing import Optional, Union
 import rasterio as rio
 from tqdm import tqdm
 
-def binarize_mask(mask: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+def binarize_mask(mask: np.ndarray, threshold: float = 0.) -> np.ndarray:
     """Convert a probability mask to binary."""
     return mask > threshold
 

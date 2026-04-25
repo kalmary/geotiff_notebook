@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
 from utils import save_tiff
 from tqdm import tqdm
+from Evaluation import binarize_mask
 
 @dataclass
 class DetectorMethod:
@@ -297,6 +298,7 @@ def detect_decrease(data: Union[str, pth.Path]):
 def test_detector():
     # Simple test with single file loaded
     path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented.tif" # TODO: remember that file must be existing
+    path = "data/processed/wrzaca 2014 2025-11-05-ORTHO-NDVI.data/tiff/wrzaca 2014 2025-11-05-ORTHO-NDVI.data_augmented.tif"
     path = pth.Path(path)
     dataset = rio.open(path)
     ndvi = dataset.read(1)
@@ -304,10 +306,10 @@ def test_detector():
     if dataset.nodata is not None:
         ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
 
-    curr_method_idx = 0
+    curr_method_idx = 2
     methods = {
-        "threshold": {"k": 2.0},
-        "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
+        "threshold": {"k": 2.2}, # 2.2 does well (poorly as necessary))
+        "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
         "msglof": {"tile_size": 256, "overlap": 32, "n_neighbors": 20,
                    "contamination": 0.1, "scales": [0.02, 0.05, 0.10],
                    "min_cluster_size": 50, "min_cluster_score": 1.5}
@@ -316,7 +318,35 @@ def test_detector():
     detector = Detector(DetectorMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))
     mask = detector.apply(ndvi)
 
-    plot_mask(mask, ndvi)
+    path_diff = str(path).replace("augmented.tif", "diff.tif")    
+    path_diff = pth.Path(path_diff)
+    
+    dataset_diff = rio.open(path_diff)
+    diff = dataset_diff.read(1)
+
+    if dataset_diff.nodata is not None:
+        diff = np.where(diff == dataset_diff.nodata, np.nan, diff).astype(np.float32)
+    
+    diff_binary = binarize_mask(diff, threshold=0.1)
+
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.title("NDVI with Detected Mask Overlay")
+    display_ndvi = np.where(np.isnan(ndvi), -999, ndvi)
+    plt.imshow(display_ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
+    overlay = np.where(mask, 1.0, np.nan)
+    plt.imshow(overlay, cmap="Blues", alpha=0.6, vmin=0, vmax=1)
+    plt.colorbar(label="NDVI")
+    plt.subplot(1, 2, 2)
+    plt.title("Augmented NDVI with Difference Mask Overlay")
+    display_ndvi_aug = np.where(np.isnan(ndvi), -999, ndvi)
+    plt.imshow(display_ndvi_aug, cmap="RdYlGn", vmin=-1, vmax=1)
+    diff_overlay = np.where(diff_binary, 1.0, np.nan)
+    plt.imshow(diff_overlay, cmap="Blues", alpha=0.6, vmin=0, vmax=1)
+    plt.colorbar(label="NDVI with Difference Mask")
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == "__main__":
     test_detector()

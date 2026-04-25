@@ -313,7 +313,7 @@ def test_clustering():
     }
     curr_method_idx = 0
     detector = Detector(ClusterMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))
-    labels, bboxes = detector.apply(mask)
+    labels, bboxes = detector.apply_patches(mask, patch_size=32)
 
     plot_clusters(mask, labels)
     plot_bbox(mask, bboxes)
