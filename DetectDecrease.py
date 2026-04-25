@@ -193,6 +193,9 @@ class Detector:
         with np.errstate(invalid="ignore", divide="ignore"):
             score_map = np.where(weight_acc > 0, score_acc / weight_acc, 0.0)
 
+        print("score map:", score_map[~nan_mask].max())
+        print("np.quantile(score_map[~nan_mask], [0.8, 0.9, 0.95, 0.99]):", np.quantile(score_map[~nan_mask], [0.8, 0.9, 0.95, 0.99]))
+
         # LOF threshold: contamination quantile
         valid_scores = score_map[~nan_mask]
         threshold = np.quantile(valid_scores, 1.0 - contamination)
@@ -216,12 +219,89 @@ class Detector:
 
         return refined
 
+    def _detect_iforest(self, data: np.ndarray, cfg: dict) -> np.ndarray:
+        """
+        Isolation Forest on multi-scale local features.
+
+        Builds the same [mean, std] x scales + gradient + rank feature map
+        as msglof, then runs a single global IsolationForest on all valid
+        pixels. No tiling, no LOF quadratic cost.
+
+        cfg keys:
+            scales           (list,  default [0.02, 0.05, 0.10])  window fracs
+            n_estimators     (int,   default 200)
+            contamination    (float, default 0.1)
+            n_jobs           (int,   default -1)
+            min_cluster_size (int,   default 20)   drop tiny FP components
+        """
+        from sklearn.ensemble import IsolationForest
+        from scipy.ndimage import uniform_filter, generic_filter, label
+        from scipy.ndimage import sobel
+
+        nan_mask = np.isnan(data)
+        filled = np.where(nan_mask, np.nanmean(data), data)
+        H, W = filled.shape
+        short = min(H, W)
+
+        scales = cfg.get("scales", [0.02, 0.05, 0.10])
+        feat_maps = []
+
+        for s in scales:
+            win = max(3, int(short * s))
+            if win % 2 == 0:
+                win += 1
+            mu = uniform_filter(filled, size=win)
+            sq_mu = uniform_filter(filled ** 2, size=win)
+            std = np.sqrt(np.clip(sq_mu - mu ** 2, 0, None))
+            feat_maps.extend([mu, std])
+
+        gx = sobel(filled, axis=1)
+        gy = sobel(filled, axis=0)
+        feat_maps.append(np.hypot(gx, gy))
+
+        win_rank = max(3, int(short * scales[1]))
+        if win_rank % 2 == 0:
+            win_rank += 1
+
+        def _rank(patch):
+            c = patch[len(patch) // 2]
+            return np.mean(patch <= c)
+
+        feat_maps.append(generic_filter(filled, _rank, size=win_rank))
+
+        features = np.stack(feat_maps, axis=-1).reshape(-1, len(feat_maps))  # (H*W, F)
+
+        valid_idx = np.where(~nan_mask.ravel())[0]
+        X_valid = features[valid_idx]
+
+        clf = IsolationForest(
+            n_estimators=cfg.get("n_estimators", 200),
+            contamination=cfg.get("contamination", 0.1),
+            n_jobs=cfg.get("n_jobs", -1),
+            random_state=0,
+        )
+        pred = clf.fit_predict(X_valid)  # -1 = anomaly, 1 = normal
+
+        flat_mask = np.zeros(H * W, dtype=bool)
+        flat_mask[valid_idx] = pred == -1
+        raw_mask = flat_mask.reshape(H, W)
+
+        min_cluster_size = cfg.get("min_cluster_size", 20)
+        labeled, n_components = label(raw_mask)
+        refined = np.zeros_like(raw_mask)
+        for comp_id in range(1, n_components + 1):
+            comp = labeled == comp_id
+            if comp.sum() >= min_cluster_size:
+                refined |= comp
+
+        return refined
 
     def _generate_mask(self, data: np.ndarray) -> np.ndarray:
         dispatch = {
             "threshold": self._detect_threshold,
-            "sauvola": self._detect_sauvola,
-            "msglof": self._detect_msglof
+            "sauvola":   self._detect_sauvola,
+            "msglof":    self._detect_msglof,
+            "iforest":   self._detect_iforest,
         }
         return dispatch[self._method.method](data, self._method.cfg)
 
@@ -257,7 +337,14 @@ def detect_decrease(data: Union[str, pth.Path]):
         "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
         "msglof": {"tile_size": 256, "overlap": 32, "n_neighbors": 20,
                    "contamination": 0.1, "scales": [0.02, 0.05, 0.10],
-                   "min_cluster_size": 50, "min_cluster_score": 1.5}
+                   "min_cluster_size": 50, "min_cluster_score": 1.5},
+        "iforest": {
+            "scales": [0.02, 0.05, 0.10],
+            "n_estimators": 200,
+            "contamination": 0.1,
+            "n_jobs": -1,
+            "min_cluster_size": 20
+        }
     }
 
     data = pth.Path(data).joinpath('processed')
@@ -310,9 +397,22 @@ def test_detector():
     methods = {
         "threshold": {"k": 2.2}, # 2.2 does well (poorly as necessary))
         "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
-        "msglof": {"tile_size": 256, "overlap": 32, "n_neighbors": 20,
-                   "contamination": 0.1, "scales": [0.02, 0.05, 0.10],
-                   "min_cluster_size": 50, "min_cluster_score": 1.5}
+        "msglof": {
+            "tile_size": 256,
+            "overlap": 64,
+            "n_neighbors": 10,
+            "contamination": 0.15,
+            "scales": [0.03, 0.08],
+            "min_cluster_size": 20,
+            "min_cluster_score": 1.1
+        },
+        "iforest": {
+            "scales": [0.02, 0.05, 0.10],
+            "n_estimators": 200,
+            "contamination": 0.1,
+            "n_jobs": -1,
+            "min_cluster_size": 20
+        }
     }
 
     detector = Detector(DetectorMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))
