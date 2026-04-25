@@ -114,6 +114,26 @@ class Detector:
         bboxes = self._get_bbox(labels)
         return labels, bboxes
 
+    def apply_patches(self, mask: np.ndarray, patch_size: int = 32) -> tuple[np.ndarray, dict]:
+        orig_h, orig_w = mask.shape
+        ph = (orig_h + patch_size - 1) // patch_size
+        pw = (orig_w + patch_size - 1) // patch_size
+
+        padded = np.zeros((ph * patch_size, pw * patch_size), dtype=bool)
+        padded[:orig_h, :orig_w] = mask
+
+        patches = padded.reshape(ph, patch_size, pw, patch_size)
+        patch_mask = patches.any(axis=(1, 3))  # (ph, pw) bool grid
+
+        small_labels, _ = self.apply(patch_mask)
+
+        labels = np.repeat(np.repeat(small_labels, patch_size, axis=0), patch_size, axis=1)
+        labels = labels[:orig_h, :orig_w]
+        labels[~mask] = -1
+
+        bboxes = self._get_bbox(labels)
+        return labels, bboxes
+
     def apply_downsampled(self, mask: np.ndarray, scale: float = 0.25) -> tuple[np.ndarray, dict]:
         import cv2
         orig_h, orig_w = mask.shape
@@ -301,7 +321,7 @@ def test_clustering():
                 
 
 if __name__ == "__main__":
-    cluster_data("data")
+    test_clustering()
 
 
         
