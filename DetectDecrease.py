@@ -24,7 +24,7 @@ from Evaluation import binarize_mask
 
 @dataclass
 class DetectorMethod:
-    method: Literal["threshold", "sauvola", "iforest"]
+    method: Literal["threshold", "threshold_dynamic", "sauvola", "gmm"]
     cfg: dict = field(default_factory=dict)
 
 
@@ -33,6 +33,11 @@ class Detector:
         self._method = method
 
     def _detect_threshold(self, data: np.ndarray, cfg: dict) -> np.ndarray:
+        valid = data[~np.isnan(data)]
+
+        return (data < cfg["threshold_val"]) & ~np.isnan(data)
+
+    def _detect_threshold_dynamic(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         from skimage.morphology import remove_small_objects, closing, disk
 
         valid = data[~np.isnan(data)]
@@ -65,80 +70,92 @@ class Detector:
                                     k=cfg["k"], r=cfg["r"])
         return (filled < thresh_map) & ~nan_mask
 
-    def _detect_iforest(self, data: np.ndarray, cfg: dict) -> np.ndarray:
-        from sklearn.ensemble import IsolationForest
-        from scipy.ndimage import uniform_filter, generic_filter, label, sobel
+
+    def _detect_gmm(self, data: np.ndarray, cfg: dict) -> np.ndarray:
+        from sklearn.mixture import GaussianMixture
+        from scipy.ndimage import uniform_filter, label, sobel
 
         nan_mask = np.isnan(data)
         filled = np.where(nan_mask, np.nanmean(data), data)
         H, W = filled.shape
         short = min(H, W)
 
-        scales = cfg["scales"]
+        scales = cfg.get("scales", [0.05, 0.15, 0.40])
         feat_maps = []
 
         for s in scales:
             win = max(3, int(short * s))
             if win % 2 == 0:
                 win += 1
-            mu = uniform_filter(filled, size=win)
-            sq_mu = uniform_filter(filled ** 2, size=win)
+            mu = uniform_filter(filled, size=win, mode='nearest')
+            sq_mu = uniform_filter(filled ** 2, size=win, mode='nearest')
             std = np.sqrt(np.clip(sq_mu - mu ** 2, 0, None))
             feat_maps.extend([mu, std])
 
         gx = sobel(filled, axis=1)
         gy = sobel(filled, axis=0)
         feat_maps.append(np.hypot(gx, gy))
-
-        win_rank = max(3, int(short * scales[1]))
-        if win_rank % 2 == 0:
-            win_rank += 1
-
-        def _rank(patch):
-            c = patch[len(patch) // 2]
-            return np.mean(patch <= c)
-
-        feat_maps.append(generic_filter(filled, _rank, size=win_rank))
-
         feat_maps.append(filled)
 
         win_local = max(3, int(short * scales[0]))
         if win_local % 2 == 0:
             win_local += 1
-        feat_maps.append(filled - uniform_filter(filled, size=win_local))
+        feat_maps.append(filled - uniform_filter(filled, size=win_local, mode='nearest'))
 
         features = np.stack(feat_maps, axis=-1).reshape(-1, len(feat_maps))
         valid_idx = np.where(~nan_mask.ravel())[0]
         X_valid = features[valid_idx]
 
-        clf = IsolationForest(
-            n_estimators=cfg["n_estimators"],
-            contamination="auto",
-            n_jobs=cfg["n_jobs"],
+        max_samples = cfg.get("max_samples", 50000)
+        rng = np.random.default_rng(0)
+
+        border_frac = cfg.get("border_frac", 0.15)
+        border_rows = int(H * border_frac)
+        border_cols = int(W * border_frac)
+        border_mask = np.zeros((H, W), dtype=bool)
+        border_mask[:border_rows, :] = True
+        border_mask[-border_rows:, :] = True
+        border_mask[:, :border_cols] = True
+        border_mask[:, -border_cols:] = True
+
+        fit_idx = np.where((~nan_mask) & border_mask)[0]
+        X_fit = features[fit_idx]
+        if len(X_fit) > max_samples:
+            X_fit = X_fit[rng.choice(len(X_fit), max_samples, replace=False)]
+
+        gmm = GaussianMixture(
+            n_components=cfg.get("n_components", 6),
+            covariance_type="full",
             random_state=0,
+            max_iter=200,
         )
-        clf.fit(X_valid)
-        scores = -clf.score_samples(X_valid)
+        gmm.fit(X_fit)
 
-        threshold = scores.mean() + cfg["n_sigma"] * scores.std()
+        log_likelihood = gmm.score_samples(X_valid)
+
+        threshold = log_likelihood.mean() - cfg.get("n_sigma", 1.5) * log_likelihood.std()
         flat_mask = np.zeros(H * W, dtype=bool)
-        flat_mask[valid_idx] = scores > threshold
+        flat_mask[valid_idx] = log_likelihood < threshold
 
-        raw_mask = flat_mask.reshape(H, W)
+        raw_mask = flat_mask.reshape(H, W) & ~nan_mask
         labeled, n_components = label(raw_mask)
         refined = np.zeros_like(raw_mask)
         for comp_id in range(1, n_components + 1):
             comp = labeled == comp_id
-            if comp.sum() >= cfg["min_cluster_size"]:
+            if comp.sum() >= cfg.get("min_cluster_size", 50):
                 refined |= comp
 
         return refined
 
+
+
+
     def _generate_mask(self, data: np.ndarray) -> np.ndarray:
         dispatch = {
             "threshold": self._detect_threshold,
+            "threshold_dynamic": self._detect_threshold_dynamic,
             "sauvola":   self._detect_sauvola,
-            "iforest":   self._detect_iforest,
+            "gmm":   self._detect_gmm
         }
         return dispatch[self._method.method](data, self._method.cfg)
 
@@ -170,7 +187,8 @@ def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
 
 def detect_decrease(data: Union[str, pth.Path]):
     methods = {
-        "threshold": {"k": 2.0},
+        "threshold": {"threshold_val": 0.3},
+        "threshold_dynamic": {"k": 2.0},
         "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
         "iforest": {
             "scales": [0.05, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
@@ -219,7 +237,7 @@ def detect_decrease(data: Union[str, pth.Path]):
 def test_detector():
     # Simple test with single file loaded
     path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented.tif" # TODO: remember that file must be existing
-    path = "data/processed/wrzaca 2014 2025-11-05-ORTHO-NDVI.data/tiff/wrzaca 2014 2025-11-05-ORTHO-NDVI.data_augmented.tif"
+    # path = "data/processed/wrzaca 2014 2025-11-05-ORTHO-NDVI.data/tiff/wrzaca 2014 2025-11-05-ORTHO-NDVI.data_augmented.tif"
     path = pth.Path(path)
     dataset = rio.open(path)
     ndvi = dataset.read(1)
@@ -227,16 +245,18 @@ def test_detector():
     if dataset.nodata is not None:
         ndvi = np.where(ndvi == dataset.nodata, np.nan, ndvi).astype(np.float32)
 
-    curr_method_idx = 2
+    curr_method_idx = 3
     methods = {
-        "threshold": {"k": 2.2}, # 2.2 does well (poorly as necessary))
+        "threshold": {"threshold_val": 0.25}, # simple global threshold (not adaptive)
+        "threshold_dynamic": {"k": 1.5}, # 2.2 does well (poorly as necessary))
         "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
-        "iforest": {
-            "scales": [0.025, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
-            "n_estimators": 300,
-            "n_jobs": -1,
-            "n_sigma": 2.9,
-            "min_cluster_size": 80
+        "gmm": {
+            "n_components": 6,
+            "scales": [0.05, 0.15, 0.40],
+            "n_sigma": 1.5,
+            "border_frac": 0.15,
+            "min_cluster_size": 50,
+            "max_samples": 50000,
         }
     }
 
