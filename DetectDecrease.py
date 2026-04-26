@@ -24,7 +24,7 @@ from Evaluation import binarize_mask
 
 @dataclass
 class DetectorMethod:
-    method: Literal["threshold", "sauvola", "msglof"]
+    method: Literal["threshold", "sauvola", "iforest"]
     cfg: dict = field(default_factory=dict)
 
 
@@ -64,160 +64,6 @@ class Detector:
         thresh_map = threshold_sauvola(filled, window_size=win,
                                     k=cfg["k"], r=cfg["r"])
         return (filled < thresh_map) & ~nan_mask
-    
-    def _detect_msglof(self, data: np.ndarray, cfg: dict) -> np.ndarray:
-        """
-        Multi-Scale Graph-refined Local Outlier Factor (MS-GLOF).
-
-        Per-pixel feature vector: [mean, std] at 3 window scales + gradient
-        magnitude + local NDVI rank. LOF run per tile (tile_size x tile_size
-        with overlap), scores stitched via Gaussian-weighted blending to avoid
-        tile boundary artefacts. Spatial graph post-processing suppresses
-        isolated false positives by dropping connected components whose mean
-        LOF score or pixel count falls below thresholds.
-
-        Reference: Breunig et al. (2000) LOF: Identifying Density-Based
-        Local Outliers. SIGMOD.
-
-        cfg keys:
-            tile_size        (int,   default 256)   tile side in pixels
-            overlap          (int,   default 32)    overlap between tiles
-            n_neighbors      (int,   default 20)    LOF k
-            contamination    (float, default 0.1)   expected outlier fraction
-            scales           (list,  default [0.02, 0.05, 0.10])
-                                                    window sizes as fraction of
-                                                    min(H, W)
-            min_cluster_size (int,   default 50)    min px per retained component
-            min_cluster_score(float, default 1.5)   min mean LOF score per component
-        """
-        from sklearn.neighbors import LocalOutlierFactor
-        from scipy.ndimage import uniform_filter, generic_filter, label
-        from scipy.ndimage import sobel
-
-
-        nan_mask = np.isnan(data)
-        filled = np.where(nan_mask, np.nanmean(data), data)
-
-        H, W = filled.shape
-        short = min(H, W)
-
-        # --- 1. Multi-scale feature map (H, W, n_features) ---
-        scales = cfg["scales"]
-        feat_maps = []
-
-        for s in scales:
-            win = max(3, int(short * s))
-            if win % 2 == 0:
-                win += 1
-            mu = uniform_filter(filled, size=win)
-            # std via E[X²] - E[X]²
-            sq_mu = uniform_filter(filled ** 2, size=win)
-            std = np.sqrt(np.clip(sq_mu - mu ** 2, 0, None))
-            feat_maps.extend([mu, std])
-
-        # gradient magnitude
-        gx = sobel(filled, axis=1)
-        gy = sobel(filled, axis=0)
-        grad = np.hypot(gx, gy)
-        feat_maps.append(grad)
-
-        # local rank: percentile of pixel within its neighbourhood
-        win_rank = max(3, int(short * scales[1]))
-        if win_rank % 2 == 0:
-            win_rank += 1
-
-        def _rank(patch):
-            c = patch[len(patch) // 2]
-            return np.mean(patch <= c)
-
-        rank_map = generic_filter(filled, _rank, size=win_rank)
-        feat_maps.append(rank_map)
-
-        features = np.stack(feat_maps, axis=-1)  # (H, W, F)
-
-        # --- 2. Tile-based LOF with Gaussian-weighted blending ---
-        tile_size = cfg["tile_size"]
-        overlap   = cfg["overlap"]
-        n_neighbors   = cfg["n_neighbors"]
-        contamination = cfg["contamination"]
-        stride = tile_size - overlap
-
-        score_acc  = np.zeros((H, W), dtype=np.float32)
-        weight_acc = np.zeros((H, W), dtype=np.float32)
-
-        # Gaussian kernel for overlap blending
-        lin = np.linspace(-1, 1, tile_size)
-        gx_k, gy_k = np.meshgrid(lin, lin)
-        gauss = np.exp(-(gx_k ** 2 + gy_k ** 2) / (2 * 0.5 ** 2)).astype(np.float32)
-
-        ys = list(range(0, H - tile_size + 1, stride))
-        xs = list(range(0, W - tile_size + 1, stride))
-
-        if not ys or ys[-1] + tile_size < H:
-            ys.append(max(0, H - tile_size))
-        if not xs or xs[-1] + tile_size < W:
-            xs.append(max(0, W - tile_size))
-
-        for y0 in ys:
-            y1 = min(y0 + tile_size, H)
-            for x0 in xs:
-                x1 = min(x0 + tile_size, W)
-                tile_feat = features[y0:y1, x0:x1]          # (th, tw, F)
-                th, tw    = tile_feat.shape[:2]
-                tile_nan  = nan_mask[y0:y1, x0:x1].ravel()
-
-                X = tile_feat.reshape(-1, tile_feat.shape[-1])
-                valid_idx = np.where(~tile_nan)[0]
-
-                if len(valid_idx) < n_neighbors + 1:
-                    continue
-
-                X_valid = X[valid_idx]
-                lof = LocalOutlierFactor(
-                    n_neighbors=n_neighbors,
-                    contamination=contamination,
-                    novelty=False,
-                )
-                lof.fit(X_valid)
-                # negative_outlier_factor_: more negative = more anomalous
-                raw_scores = -lof.negative_outlier_factor_  # (n_valid,)
-
-                tile_scores = np.zeros(th * tw, dtype=np.float32)
-                tile_scores[valid_idx] = raw_scores.astype(np.float32)
-                tile_scores = tile_scores.reshape(th, tw)
-
-                g = gauss[:th, :tw]
-                score_acc[y0:y1, x0:x1]  += tile_scores * g
-                weight_acc[y0:y1, x0:x1] += g
-
-        with np.errstate(invalid="ignore", divide="ignore"):
-            score_map = np.where(weight_acc > 0, score_acc / weight_acc, 0.0)
-
-        print("score map:", score_map[~nan_mask].max())
-        print("np.quantile(score_map[~nan_mask], [0.8, 0.9, 0.95, 0.99]):", np.quantile(score_map[~nan_mask], [0.8, 0.9, 0.95, 0.99]))
-
-        # LOF threshold: contamination quantile
-        valid_scores = score_map[~nan_mask]
-        threshold = np.quantile(valid_scores, 1.0 - contamination)
-        raw_mask = (score_map > threshold) & ~nan_mask
-
-        # --- 3. Spatial graph refinement ---
-        min_cluster_size  = cfg["min_cluster_size"]
-        min_cluster_score = cfg["min_cluster_score"]
-
-        labeled, n_components = label(raw_mask)
-        refined = np.zeros_like(raw_mask)
-
-        for comp_id in range(1, n_components + 1):
-            comp = labeled == comp_id
-            if comp.sum() < min_cluster_size:
-                continue
-            mean_score = score_map[comp].mean()
-            if mean_score < min_cluster_score:
-                continue
-            refined |= comp
-
-        return refined
 
     def _detect_iforest(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         """
@@ -243,7 +89,7 @@ class Detector:
         H, W = filled.shape
         short = min(H, W)
 
-        scales = cfg.get("scales", [0.02, 0.05, 0.10])
+        scales = cfg["scales"]
         feat_maps = []
 
         for s in scales:
@@ -275,9 +121,9 @@ class Detector:
         X_valid = features[valid_idx]
 
         clf = IsolationForest(
-            n_estimators=cfg.get("n_estimators", 200),
-            contamination=cfg.get("contamination", 0.1),
-            n_jobs=cfg.get("n_jobs", -1),
+            n_estimators=cfg["n_estimators"],
+            contamination=cfg["contamination"],
+            n_jobs=cfg["n_jobs"],
             random_state=0,
         )
         pred = clf.fit_predict(X_valid)  # -1 = anomaly, 1 = normal
@@ -286,7 +132,7 @@ class Detector:
         flat_mask[valid_idx] = pred == -1
         raw_mask = flat_mask.reshape(H, W)
 
-        min_cluster_size = cfg.get("min_cluster_size", 20)
+        min_cluster_size = cfg["min_cluster_size"]
         labeled, n_components = label(raw_mask)
         refined = np.zeros_like(raw_mask)
         for comp_id in range(1, n_components + 1):
@@ -300,7 +146,6 @@ class Detector:
         dispatch = {
             "threshold": self._detect_threshold,
             "sauvola":   self._detect_sauvola,
-            "msglof":    self._detect_msglof,
             "iforest":   self._detect_iforest,
         }
         return dispatch[self._method.method](data, self._method.cfg)
@@ -335,9 +180,6 @@ def detect_decrease(data: Union[str, pth.Path]):
     methods = {
         "threshold": {"k": 2.0},
         "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
-        "msglof": {"tile_size": 256, "overlap": 32, "n_neighbors": 20,
-                   "contamination": 0.1, "scales": [0.02, 0.05, 0.10],
-                   "min_cluster_size": 50, "min_cluster_score": 1.5},
         "iforest": {
             "scales": [0.02, 0.05, 0.10],
             "n_estimators": 200,
@@ -397,15 +239,6 @@ def test_detector():
     methods = {
         "threshold": {"k": 2.2}, # 2.2 does well (poorly as necessary))
         "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
-        "msglof": {
-            "tile_size": 256,
-            "overlap": 64,
-            "n_neighbors": 10,
-            "contamination": 0.15,
-            "scales": [0.03, 0.08],
-            "min_cluster_size": 20,
-            "min_cluster_score": 1.1
-        },
         "iforest": {
             "scales": [0.02, 0.05, 0.10],
             "n_estimators": 200,
