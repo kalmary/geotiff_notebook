@@ -232,10 +232,10 @@ def test_detector():
         "threshold": {"k": 2.2}, # 2.2 does well (poorly as necessary))
         "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
         "iforest": {
-            "scales": [0.035, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
+            "scales": [0.025, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
             "n_estimators": 300,
             "n_jobs": -1,
-            "n_sigma": 2.85,
+            "n_sigma": 2.9,
             "min_cluster_size": 80
         }
     }
