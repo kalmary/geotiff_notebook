@@ -66,23 +66,8 @@ class Detector:
         return (filled < thresh_map) & ~nan_mask
 
     def _detect_iforest(self, data: np.ndarray, cfg: dict) -> np.ndarray:
-        """
-        Isolation Forest on multi-scale local features.
-
-        Builds the same [mean, std] x scales + gradient + rank feature map
-        as msglof, then runs a single global IsolationForest on all valid
-        pixels. No tiling, no LOF quadratic cost.
-
-        cfg keys:
-            scales           (list,  default [0.02, 0.05, 0.10])  window fracs
-            n_estimators     (int,   default 200)
-            contamination    (float, default 0.1)
-            n_jobs           (int,   default -1)
-            min_cluster_size (int,   default 20)   drop tiny FP components
-        """
         from sklearn.ensemble import IsolationForest
-        from scipy.ndimage import uniform_filter, generic_filter, label
-        from scipy.ndimage import sobel
+        from scipy.ndimage import uniform_filter, generic_filter, label, sobel
 
         nan_mask = np.isnan(data)
         filled = np.where(nan_mask, np.nanmean(data), data)
@@ -115,29 +100,36 @@ class Detector:
 
         feat_maps.append(generic_filter(filled, _rank, size=win_rank))
 
-        features = np.stack(feat_maps, axis=-1).reshape(-1, len(feat_maps))  # (H*W, F)
+        feat_maps.append(filled)
 
+        win_local = max(3, int(short * scales[0]))
+        if win_local % 2 == 0:
+            win_local += 1
+        feat_maps.append(filled - uniform_filter(filled, size=win_local))
+
+        features = np.stack(feat_maps, axis=-1).reshape(-1, len(feat_maps))
         valid_idx = np.where(~nan_mask.ravel())[0]
         X_valid = features[valid_idx]
 
         clf = IsolationForest(
             n_estimators=cfg["n_estimators"],
-            contamination=cfg["contamination"],
+            contamination="auto",
             n_jobs=cfg["n_jobs"],
             random_state=0,
         )
-        pred = clf.fit_predict(X_valid)  # -1 = anomaly, 1 = normal
+        clf.fit(X_valid)
+        scores = -clf.score_samples(X_valid)
 
+        threshold = scores.mean() + cfg["n_sigma"] * scores.std()
         flat_mask = np.zeros(H * W, dtype=bool)
-        flat_mask[valid_idx] = pred == -1
-        raw_mask = flat_mask.reshape(H, W)
+        flat_mask[valid_idx] = scores > threshold
 
-        min_cluster_size = cfg["min_cluster_size"]
+        raw_mask = flat_mask.reshape(H, W)
         labeled, n_components = label(raw_mask)
         refined = np.zeros_like(raw_mask)
         for comp_id in range(1, n_components + 1):
             comp = labeled == comp_id
-            if comp.sum() >= min_cluster_size:
+            if comp.sum() >= cfg["min_cluster_size"]:
                 refined |= comp
 
         return refined
@@ -185,6 +177,7 @@ def detect_decrease(data: Union[str, pth.Path]):
             "n_estimators": 200,
             "contamination": 0.1,
             "n_jobs": -1,
+            "n_sigma": 2.5,
             "min_cluster_size": 20
         }
     }
@@ -240,11 +233,11 @@ def test_detector():
         "threshold": {"k": 2.2}, # 2.2 does well (poorly as necessary))
         "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
         "iforest": {
-            "scales": [0.02, 0.05, 0.10],
-            "n_estimators": 200,
-            "contamination": 0.1,
+            "scales": [0.05, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
+            "n_estimators": 300,
             "n_jobs": -1,
-            "min_cluster_size": 20
+            "n_sigma": 2.9,                # lower than 2.6 to catch weak anomalies like image 2
+            "min_cluster_size": 80,        # was 100, forest FPs will be killed by raw NDVI feature instead
         }
     }
 
