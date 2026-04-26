@@ -154,6 +154,19 @@ class Detector:
         return labels, bboxes
 
     
+def _vis_patches(ndvi: np.ndarray, patch_size: int) -> None:
+    import matplotlib.pyplot as plt
+    h, w = ndvi.shape
+    fig, ax = plt.subplots()
+    ax.imshow(np.where(np.isnan(ndvi), -999, ndvi), cmap="RdYlGn", vmin=-1, vmax=1)
+    for y in range(0, h, patch_size):
+        ax.axhline(y - 0.5, color="blue", linewidth=0.5, alpha=0.6)
+    for x in range(0, w, patch_size):
+        ax.axvline(x - 0.5, color="blue", linewidth=0.5, alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+
 def plot_clusters(data: np.ndarray, labels: np.ndarray, ax=None,  path: Optional[Union[str, pth.Path]]=None) -> None:
     import matplotlib.pyplot as plt
     from matplotlib.colors import BoundaryNorm
@@ -210,6 +223,17 @@ def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str,
 
 
 
+def _load_ndvi(mask_file: pth.Path) -> np.ndarray:
+    import re
+    ndvi_stem = re.sub(r"_mask_\w+$", "", mask_file.stem)
+    ndvi_file = mask_file.parent / f"{ndvi_stem}.tif"
+    with rio.open(ndvi_file) as ds:
+        ndvi = ds.read(1).astype(np.float32)
+        if ds.nodata is not None:
+            ndvi[ndvi == ds.nodata] = np.nan
+    return ndvi
+
+
 def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
     import pathlib as pth
     from utils import load_data
@@ -258,6 +282,8 @@ def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
         tiff_dir = file.parent
         plots_dir = file.parent.parent.joinpath('plots')
 
+        ndvi = _load_ndvi(file)
+
         for method, cfg in methods.items():
             detection_method = file.stem.rsplit("_")[-1]
             plots_dir_method = plots_dir / detection_method
@@ -269,14 +295,18 @@ def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
                 
             labels, bboxes = detector.apply(mask)
 
-            # plot clusters
-            plot_clusters(mask, labels, path=plots_dir_method / f"{file.stem}_clusters_{method}.png")
-            plot_bbox(mask, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")
+            plot_clusters(ndvi, labels, path=plots_dir_method / f"{file.stem}_clusters_{method}.png")
+            plot_bbox(ndvi, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")
 
 def test_clustering():
     path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented_mask_threshold.tif" # TODO: remember that file must be existing
     # TODO - worst testing, must be done for every detection method
     path = pth.Path(path)
+    ndvi = _load_ndvi(path)
+
+    # _vis_patches(ndvi, patch_size=16) # check if patch size is satisfactory for the data, if not - change it and check again. for drought and flood huge patches are better, for boars - smaller ones. keep balance
+
+
     dataset = rio.open(path)
     mask = dataset.read(1).astype(bool)
 
@@ -315,8 +345,9 @@ def test_clustering():
     detector = Detector(ClusterMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))
     labels, bboxes = detector.apply_patches(mask, patch_size=32)
 
-    plot_clusters(mask, labels)
-    plot_bbox(mask, bboxes)
+    
+    plot_clusters(ndvi, labels)
+    plot_bbox(ndvi, bboxes)
 
                 
 
