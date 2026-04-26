@@ -80,7 +80,7 @@ class Detector:
         H, W = filled.shape
         short = min(H, W)
 
-        scales = cfg.get("scales", [0.05, 0.15, 0.40])
+        scales = cfg.get("scales")
         feat_maps = []
 
         for s in scales:
@@ -106,10 +106,10 @@ class Detector:
         valid_idx = np.where(~nan_mask.ravel())[0]
         X_valid = features[valid_idx]
 
-        max_samples = cfg.get("max_samples", 50000)
+        max_samples = cfg.get("max_samples")
         rng = np.random.default_rng(0)
 
-        border_frac = cfg.get("border_frac", 0.15)
+        border_frac = cfg.get("border_frac")
         border_rows = int(H * border_frac)
         border_cols = int(W * border_frac)
         border_mask = np.zeros((H, W), dtype=bool)
@@ -124,7 +124,7 @@ class Detector:
             X_fit = X_fit[rng.choice(len(X_fit), max_samples, replace=False)]
 
         gmm = GaussianMixture(
-            n_components=cfg.get("n_components", 6),
+            n_components=cfg.get("n_components"),
             covariance_type="full",
             random_state=0,
             max_iter=200,
@@ -133,7 +133,7 @@ class Detector:
 
         log_likelihood = gmm.score_samples(X_valid)
 
-        threshold = log_likelihood.mean() - cfg.get("n_sigma", 1.5) * log_likelihood.std()
+        threshold = log_likelihood.mean() - cfg.get("n_sigma") * log_likelihood.std()
         flat_mask = np.zeros(H * W, dtype=bool)
         flat_mask[valid_idx] = log_likelihood < threshold
 
@@ -191,7 +191,7 @@ def detect_decrease(data: Union[str, pth.Path]):
         "threshold_dynamic": {"k": 2.0},
         "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
         "iforest": {
-            "scales": [0.05, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
+            "scales": [0.1, 0.15, 0.4],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
             "n_estimators": 300,
             "n_jobs": -1,
             "n_sigma": 2.9,   
@@ -237,7 +237,7 @@ def detect_decrease(data: Union[str, pth.Path]):
 def test_detector():
     # Simple test with single file loaded
     path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented.tif" # TODO: remember that file must be existing
-    # path = "data/processed/wrzaca 2014 2025-11-05-ORTHO-NDVI.data/tiff/wrzaca 2014 2025-11-05-ORTHO-NDVI.data_augmented.tif"
+    path = "data/processed/wrzaca 2014 2025-11-05-ORTHO-NDVI.data/tiff/wrzaca 2014 2025-11-05-ORTHO-NDVI.data_augmented.tif"
     path = pth.Path(path)
     dataset = rio.open(path)
     ndvi = dataset.read(1)
@@ -252,10 +252,10 @@ def test_detector():
         "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
         "gmm": {
             "n_components": 6,
-            "scales": [0.05, 0.15, 0.40],
-            "n_sigma": 1.5,
-            "border_frac": 0.15,
-            "min_cluster_size": 50,
+            "scales": [0.25, 0.4, 0.6],
+            "n_sigma": 2.5,
+            "border_frac": 0.3,
+            "min_cluster_size": 100,
             "max_samples": 50000,
         }
     }
