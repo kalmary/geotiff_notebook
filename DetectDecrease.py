@@ -173,12 +173,11 @@ def detect_decrease(data: Union[str, pth.Path]):
         "threshold": {"k": 2.0},
         "sauvola": {"win_frac": 0.05, "k": 0.2, "r": 0.5},
         "iforest": {
-            "scales": [0.02, 0.05, 0.10],
-            "n_estimators": 200,
-            "contamination": 0.1,
+            "scales": [0.05, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
+            "n_estimators": 300,
             "n_jobs": -1,
-            "n_sigma": 2.5,
-            "min_cluster_size": 20
+            "n_sigma": 2.9,   
+            "min_cluster_size": 80
         }
     }
 
@@ -233,11 +232,11 @@ def test_detector():
         "threshold": {"k": 2.2}, # 2.2 does well (poorly as necessary))
         "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
         "iforest": {
-            "scales": [0.05, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
+            "scales": [0.035, 0.15, 0.2],  # drop 0.01 (too noisy), keep 0.15 for large patch interiors
             "n_estimators": 300,
             "n_jobs": -1,
-            "n_sigma": 2.9,                # lower than 2.6 to catch weak anomalies like image 2
-            "min_cluster_size": 80,        # was 100, forest FPs will be killed by raw NDVI feature instead
+            "n_sigma": 2.85,
+            "min_cluster_size": 80
         }
     }
 
