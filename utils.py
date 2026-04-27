@@ -110,7 +110,7 @@ def load_data(source_dir: str, extension: str = "tif", verbose: bool = False):
     path_list = list(source_dir.glob(pattern))
 
     if verbose:
-        path_list = tqdm(path_list, total=len(path_list), desc="File iteration")
+        path_list = tqdm(path_list, total=len(path_list), desc="Data augmentation")
 
     # print(path)
     # print(path.resolve())

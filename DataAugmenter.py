@@ -353,7 +353,7 @@ def augment_ndvi(ndvi: np.ndarray):
     methods_keys = list(methods.keys())
     key = np.random.choice(methods_keys, p=[0.40, 0.30, 0.30]) # prob distribution for methods, boars should be slightly more common than drought and flood
     count = np.random.randint(methods[key][1][0], methods[key][1][1])
-    intensity = methods[key][2] # use the intensity value from the methods dictionary
+    intensity = methods[key][1][2] # use the intensity value from the methods dictionary
 
     sim1 = NDVIdecreaseSimulator(ndvi.copy())
     sim1.apply(DegradationEvent(cause=methods[key][0], seed=42, count=count, intensity=intensity))
