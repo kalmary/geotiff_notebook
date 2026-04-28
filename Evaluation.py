@@ -22,6 +22,35 @@ def plot_confusion_matrix(mask: np.ndarray, ground_truth: np.ndarray, path2save:
     if path2save is not None:
         path2save = pth.Path(path2save)
         plt.savefig(path2save)
+        plt.close()
+    else:
+        plt.show()
+
+def prc_curve(mask: np.ndarray, ground_truth: np.ndarray, path2save: Optional[Union[str, pth.Path]] = None) -> None:
+    """Plot Precision-Recall curve of the mask compared to ground truth."""
+    from sklearn.metrics import precision_recall_curve, PrecisionRecallDisplay
+
+    precision, recall, _ = precision_recall_curve(ground_truth.flatten(), mask.flatten())
+    disp = PrecisionRecallDisplay(precision=precision, recall=recall)
+    disp.plot()
+    if path2save is not None:
+        path2save = pth.Path(path2save)
+        plt.savefig(path2save)
+        plt.close()
+    else:
+        plt.show()
+
+def roc_curve(mask: np.ndarray, ground_truth: np.ndarray, path2save: Optional[Union[str, pth.Path]] = None) -> None:
+    """Plot ROC curve of the mask compared to ground truth."""
+    from sklearn.metrics import roc_curve, RocCurveDisplay
+
+    fpr, tpr, _ = roc_curve(ground_truth.flatten(), mask.flatten())
+    disp = RocCurveDisplay(fpr=fpr, tpr=tpr)
+    disp.plot()
+    if path2save is not None:
+        path2save = pth.Path(path2save)
+        plt.savefig(path2save)
+        plt.close()
     else:
         plt.show()
 
@@ -69,12 +98,76 @@ def evaluate_results(data_path: Union[pth.Path, str]) -> None:
         miou = get_miou(diff_binary, mask)
         classification_report_str = classification_report(mask.flatten(), diff_binary.flatten(), zero_division=0)
         plot_confusion_matrix(diff_binary, mask, path2save=plots_folder_method / f"{file.stem}_confusion_matrix.png")
+        prc_curve(diff_binary, mask, path2save=plots_folder_method / f"{file.stem}_prc_curve.png")
+        roc_curve(diff_binary, mask, path2save=plots_folder_method / f"{file.stem}_roc_curve.png")
 
         with open(plots_folder_method / f"{file.stem}_classification_report.txt", "w") as f:
             f.write(classification_report_str)
 
+def summarize_results(data_path: Union[pth.Path, str]) -> None:
+    from collections import defaultdict
+    processed = pth.Path(data_path).joinpath("processed")
+
+    reports = list(processed.rglob("*_classification_report.txt"))
+
+    by_method: dict[str, list[dict]] = defaultdict(list)
+    for report in reports:
+        method = report.parent.name
+        field = report.stem.split("_augmented_mask_")[0]
+
+        tiff_dir = report.parent.parent.parent / "tiff"
+        mask_file = tiff_dir / f"{field}_augmented_mask_{method}.tif"
+        diff_file = tiff_dir / f"{field}_diff.tif"
+
+        with rio.open(mask_file) as ds:
+            mask = ds.read(1).astype(bool)
+        with rio.open(diff_file) as ds:
+            diff = ds.read(1).astype(np.float32)
+            if ds.nodata is not None:
+                diff[diff == ds.nodata] = np.nan
+        gt = binarize_mask(diff)
+
+        from sklearn.metrics import matthews_corrcoef, cohen_kappa_score, f1_score
+        y_true, y_pred = gt.flatten(), mask.flatten()
+        f1    = f1_score(y_true, y_pred, zero_division=0)
+        mcc   = matthews_corrcoef(y_true, y_pred)
+        kappa = cohen_kappa_score(y_true, y_pred)
+        iou   = get_miou(mask, gt)
+
+        by_method[method].append({"field": field, "f1": f1, "mcc": mcc, "kappa": kappa, "iou": iou})
+
+    metrics = ["f1", "mcc", "kappa", "iou"]
+
+    for method, rows in by_method.items():
+        fields = [r["field"] for r in rows]
+
+        fig, axes = plt.subplots(1, len(metrics), figsize=(5 * len(metrics), 5))
+        summary_lines = [f"Method: {method}"]
+
+        for ax, metric in zip(axes, metrics):
+            vals = [r[metric] for r in rows]
+            ax.bar(fields, vals)
+            ax.set_title(metric)
+            ax.set_ylim(-1 if metric in ("mcc", "kappa") else 0, 1)
+            ax.tick_params(axis="x", rotation=30)
+            for label in ax.get_xticklabels():
+                label.set_ha("right")
+            summary_lines.append(f"\n{metric}:")
+            for field, val in zip(fields, vals):
+                summary_lines.append(f"  {field}: {val:.3f}")
+            summary_lines.append(f"  mean: {np.mean(vals):.3f}")
+
+        plt.suptitle(f"{method} — per field (True class)")
+        plt.tight_layout()
+        fig.savefig(processed / f"summary_{method}.png", dpi=150, bbox_inches="tight")
+        (processed / f"summary_{method}.txt").write_text("\n".join(summary_lines))
+        # plt.show()
+        plt.close(fig)
+
+
 if __name__ == "__main__":
     evaluate_results("data")
+    summarize_results("data")
 
 
 

@@ -259,10 +259,10 @@ class NDVIdecreaseSimulator:
         for _ in range(n_epicentres):
             cx, cy = self._cx_cy(rng, margin=0.0)
 
-            rx    = gauss(rng, 0.15 * self.shape[1], 0.05 * self.shape[1],
-                          lo=0.06 * self.shape[1], hi=0.28 * self.shape[1])
-            ry    = gauss(rng, 0.12 * self.shape[0], 0.05 * self.shape[0],
-                          lo=0.05 * self.shape[0], hi=0.24 * self.shape[0])
+            rx    = gauss(rng, 0.07 * self.shape[1], 0.035 * self.shape[1],
+                          lo=0.02 * self.shape[1], hi=0.2 * self.shape[1])
+            ry    = gauss(rng, 0.07 * self.shape[0], 0.035 * self.shape[0],
+                          lo=0.02 * self.shape[0], hi=0.2 * self.shape[0])
             angle = rng.uniform(0, np.pi)
 
             dx = (X - cx) * np.cos(angle) + (Y - cy) * np.sin(angle)
@@ -423,6 +423,7 @@ def augment_data(path: Optional[Union[str, pth.Path]]) -> None:
                     vmax=1)
             plt.colorbar()
             plt.savefig(plt_path, dpi=300, bbox_inches = "tight")
+            plt.close()
 
 
             # save key to txt

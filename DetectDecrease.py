@@ -105,14 +105,14 @@ def plot_mask(mask, ndvi, ax=None, path: Union[str, pth.Path] = None):
             fig.savefig(path, dpi=300, bbox_inches="tight")
         else:
             plt.show()
-        plt.close(fig)
+        plt.close()
 
 
 def detect_decrease(data: Union[str, pth.Path]):
     methods = {
         "threshold": {"threshold_val": 0.25}, # simple global threshold (not adaptive)
-        "threshold-dynamic": {"k": 1.5}, # 2.2 does well (poorly as necessary))
-        "sauvola": {"win_frac": 0.01, "k": 2.7, "r": 0.4}, # good enough
+        "threshold-dynamic": {"k": 1.9}, # 2.2 does well (poorly as necessary))
+        "sauvola": {"win_frac": 0.005, "k": 2.7, "r": 0.6} # good enough
     }
 
     data = pth.Path(data).joinpath('processed')
@@ -153,7 +153,7 @@ def detect_decrease(data: Union[str, pth.Path]):
 def test_detector():
     # Simple test with single file loaded
     path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented.tif" # TODO: remember that file must be existing
-    path = "data/processed/wrzaca 1404 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 1404 2025-06-26-ORTHO-NDVI.data_augmented.tif"
+    path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented.tif"
     path = pth.Path(path)
     dataset = rio.open(path)
     ndvi = dataset.read(1)
@@ -164,8 +164,8 @@ def test_detector():
     curr_method_idx = 2
     methods = {
         "threshold": {"threshold_val": 0.25}, # simple global threshold (not adaptive)
-        "threshold-dynamic": {"k": 1.5}, # 2.2 does well (poorly as necessary))
-        "sauvola": {"win_frac": 0.005, "k": 2.7, "r": 0.25} # good enough
+        "threshold-dynamic": {"k": 1.9}, # 2.2 does well (poorly as necessary))
+        "sauvola": {"win_frac": 0.005, "k": 2.7, "r": 0.6} # good enough
     }
 
     detector = Detector(DetectorMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))

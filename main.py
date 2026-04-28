@@ -1,7 +1,7 @@
 # simple pipeline to run all programs in correct order
 from DataAugmenter import augment_data
 from DetectDecrease import detect_decrease
-from Evaluation import evaluate_results
+from Evaluation import evaluate_results, summarize_results
 from DataClustering import cluster_data
 
 
@@ -14,9 +14,10 @@ def main():
 
     # Step 3: Evaluation
     evaluate_results("data")
+    summarize_results("data")
     
     # Step 4: Data Clustering
-    cluster_data("data") # slow and optional
+    cluster_data("data")
 
 if __name__ == "__main__":
     main()

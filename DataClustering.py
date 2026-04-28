@@ -44,7 +44,7 @@ class Detector:
 
     def _kmeans(self, data: np.ndarray, cfg: dict) -> np.ndarray:
         from sklearn.cluster import KMeans
-        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, KMeans, range(1, 8))
+        cfg["n_clusters"] = self.find_optimal_k_silhouette(data, KMeans, range(1, 5))
 
         model = KMeans(n_clusters=cfg["n_clusters"], **cfg.get("kwargs", {}))
         labels = model.fit_predict(data)
@@ -178,22 +178,26 @@ def plot_clusters(data: np.ndarray, labels: np.ndarray, ax=None,  path: Optional
     cmap = colormaps["tab20"].resampled(len(unique))
     norm = BoundaryNorm(range(len(unique) + 1), cmap.N)
 
+    ax.imshow(np.where(np.isnan(data), -999, data), cmap="RdYlGn", vmin=-1, vmax=1, interpolation="none")
+
     display = np.full(data.shape, np.nan)
     for i, label in enumerate(unique):
         display[labels == label] = i
 
-    im = ax.imshow(display, cmap=cmap, norm=norm, interpolation="none")
+    im = ax.imshow(display, cmap=cmap, norm=norm, interpolation="none", alpha=0.6)
     plt.colorbar(im, ax=ax, ticks=range(len(unique)), label="Cluster")
     ax.set_title("NDVI Clusters")
 
     if fig is not None:
         plt.tight_layout()
 
+
         if path is None:
             plt.show()
         else:
             path = pth.Path(path)
             plt.savefig(path, dpi=300, bbox_inches='tight')
+        plt.close()
 
 def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str, pth.Path]]=None) -> None:
     import matplotlib.pyplot as plt
@@ -218,14 +222,14 @@ def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str,
         else:
             path = pth.Path(path)
             plt.savefig(path, dpi=300, bbox_inches='tight')
+    plt.close()
 
 
 
 
 
 def _load_ndvi(mask_file: pth.Path) -> np.ndarray:
-    import re
-    ndvi_stem = re.sub(r"_mask_\w+$", "", mask_file.stem)
+    ndvi_stem = mask_file.stem.split("_mask_")[0]
     ndvi_file = mask_file.parent / f"{ndvi_stem}.tif"
     with rio.open(ndvi_file) as ds:
         ndvi = ds.read(1).astype(np.float32)
@@ -234,7 +238,7 @@ def _load_ndvi(mask_file: pth.Path) -> np.ndarray:
     return ndvi
 
 
-def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
+def cluster_data(path: Optional[Union[str, pth.Path]] = "data") -> None:
     import pathlib as pth
     from utils import load_data
     from tqdm import tqdm
@@ -276,7 +280,7 @@ def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
     file_list = list(data_path.rglob('*.tif'))
     file_list = [f for f in file_list if '_mask' in f.name]
 
-    pbar = tqdm(file_list, total=len(file_list), desc="Processing files")
+    pbar = tqdm(file_list, total=len(file_list), desc="Clustering changes")
 
     for file in pbar:
         tiff_dir = file.parent
@@ -293,18 +297,23 @@ def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
             with rio.open(file) as dataset:
                 mask = dataset.read(1).astype(bool)
                 
-            labels, bboxes = detector.apply_patches(mask, patch_size=16)
-
-            plot_clusters(ndvi, labels, path=plots_dir_method / f"{file.stem}_clusters_{method}.png")
-            plot_bbox(ndvi, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")
+            labels, bboxes = detector.apply_patches(mask, patch_size=32)
+            try:
+                plot_clusters(ndvi, labels, path=plots_dir_method / f"{file.stem}_clusters_{method}.png")
+                plot_bbox(ndvi, bboxes, path=plots_dir_method / f"{file.stem}_bbox_{method}.png")
+            except Exception as e:
+                print(f"Error during plotting: {e}")
+                print("file:", file, '  method:', method, '  detection method:', detection_method)
+                print("labels shape:", labels.shape, "unique labels:", np.unique(labels))
+                raise e
 
 def test_clustering():
-    path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented_mask_threshold.tif" # TODO: remember that file must be existing
+    path = "data/processed/wrzaca 418 2025-06-26-ORTHO-NDVI.data/tiff/wrzaca 418 2025-06-26-ORTHO-NDVI.data_augmented_mask_threshold-dynamic.tif" # TODO: remember that file must be existing
     # TODO - worst testing, must be done for every detection method
     path = pth.Path(path)
     ndvi = _load_ndvi(path)
 
-    # _vis_patches(ndvi, patch_size=16) # check if patch size is satisfactory for the data, if not - change it and check again. for drought and flood huge patches are better, for boars - smaller ones. keep balance
+    _vis_patches(ndvi, patch_size=16) # check if patch size is satisfactory for the data, if not - change it and check again. for drought and flood huge patches are better, for boars - smaller ones. keep balance
 
 
     dataset = rio.open(path)
@@ -313,41 +322,44 @@ def test_clustering():
     methods = {
         "KMeans": {
             "n_init": "auto", # int if not auto
-            "max_iter": 300,
+            "max_iter": 500,
             "tol": 0.0001,
             "random_state": 42,
         },
         "MeanShift": {
             "min_bin_freq": 1,
             "cluster_all": True,
-            "max_iter": 300
+            "max_iter": 500
         },
         "AgglomerativeClustering": {
             "metric": "euclidean",
-            "linkage": "ward",
+            "linkage": "average",
         },
         "SpectralClustering": {
             "n_init": 10,
-            "gamma": 1.0,
-            "affinity": "rbf",
-            "n_neighbors": 10,
+            "affinity": "nearest_neighbors",
+            "n_neighbors": 20,
         },
         "HDBSCAN": {
-            "min_cluster_size": 20,
-            "min_samples": None,
-            "cluster_selection_epsilon": 0.0,
+            "min_cluster_size": 3,
+            "min_samples": 3,
+            "cluster_selection_epsilon": 0.,
             "metric": "euclidean",
-            "alpha": 1.0,
+            "alpha": 0.5,
             "leaf_size": 40
         },
     }
-    curr_method_idx = 0
+    curr_method_idx = 4
     detector = Detector(ClusterMethod(method=list(methods.keys())[curr_method_idx], cfg=methods[list(methods.keys())[curr_method_idx]]))
-    labels, bboxes = detector.apply_patches(mask, patch_size=32)
+    labels, bboxes = detector.apply_patches(mask.copy(), patch_size=32)
 
-    
-    plot_clusters(ndvi, labels)
-    plot_bbox(ndvi, bboxes)
+    try:
+        plot_clusters(ndvi, labels)
+        plot_bbox(ndvi, bboxes)
+    except Exception as e:
+        print(f"Error during plotting: {e}")
+        print("file:", path)
+        print("labels shape:", labels.shape, "unique labels:", np.unique(labels))
 
                 
 
