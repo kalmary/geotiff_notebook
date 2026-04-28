@@ -293,7 +293,7 @@ def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
             with rio.open(file) as dataset:
                 mask = dataset.read(1).astype(bool)
                 
-            labels, bboxes = detector.apply(mask)
+            labels, bboxes = detector.apply_patches(mask, patch_size=16)
 
             plot_clusters(ndvi, labels, path=plots_dir_method / f"{file.stem}_clusters_{method}.png")
             plot_bbox(ndvi, bboxes, path=plots_dir / f"{file.stem}_bbox_{method}.png")

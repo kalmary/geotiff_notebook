@@ -16,7 +16,7 @@ def main():
     evaluate_results("data")
     
     # Step 4: Data Clustering
-    # cluster_data("data") # slow and optional
+    cluster_data("data") # slow and optional
 
 if __name__ == "__main__":
     main()

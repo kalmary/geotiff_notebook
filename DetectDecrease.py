@@ -120,7 +120,7 @@ def detect_decrease(data: Union[str, pth.Path]):
     file_list = list(data.rglob('*.tif'))
     file_list = [f for f in file_list if '_augmented' in f.name and '_mask' not in f.name]
 
-    pbar = tqdm(file_list, total=len(file_list), desc="Processing files")
+    pbar = tqdm(file_list, total=len(file_list), desc="Detecting anomalies")
 
     for file in pbar:
         tiff_dir = file.parent
