@@ -367,8 +367,9 @@ def visualize(results: np.ndarray):
     """
 
     plt.figure(figsize=(8,5)) # adding this makes all the figures appear in separate windows, idk why but seems to be working xd
-    plt.imshow(np.where(np.isnan(results), -999, results),
-            cmap='RdYlGn',
+    _cmap = plt.get_cmap("RdYlGn").copy(); _cmap.set_bad("white")
+    plt.imshow(np.where(np.isnan(results), np.nan, results),
+            cmap=_cmap,
             vmin=-1,
             vmax=1)
     # plt.savefig('ndvi.png', dpi=300) # zapisuje obrazek do pliku, zeby nie tracic jakosci
@@ -420,8 +421,9 @@ def augment_data(path: Optional[Union[str, pth.Path]]) -> None:
             plt_path = plots_dir.joinpath(path.stem + f"_{key}.png")
             plt.figure(figsize=(8,5))
             plt.title(key)
-            plt.imshow(np.where(np.isnan(result), -999, result),
-                    cmap='RdYlGn',
+            _cmap = plt.get_cmap("RdYlGn").copy(); _cmap.set_bad("white")
+            plt.imshow(np.where(np.isnan(result), np.nan, result),
+                    cmap=_cmap,
                     vmin=-1,
                     vmax=1)
             plt.colorbar()
@@ -458,24 +460,25 @@ def test_augmentation():
     difference = ndvi_lowres - results
 
     plt.figure(figsize=(15,5))
+    _cmap = plt.get_cmap("RdYlGn").copy(); _cmap.set_bad("white")
     plt.subplot(1,3,1)
     plt.title("Original NDVI")
-    plt.imshow(np.where(np.isnan(ndvi_lowres), -999, ndvi_lowres),
-            cmap='RdYlGn',
+    plt.imshow(np.where(np.isnan(ndvi_lowres), np.nan, ndvi_lowres),
+            cmap=_cmap,
             vmin=-1,
             vmax=1)
     plt.colorbar()
     plt.subplot(1,3,2)
     plt.title(f"Augmented NDVI\nCause: {cause[curr_cause_idx][0]}, Count: 1, Intensity: {cause[curr_cause_idx][1][2]}")
-    plt.imshow(np.where(np.isnan(results), -999, results),
-            cmap='RdYlGn',
+    plt.imshow(np.where(np.isnan(results), np.nan, results),
+            cmap=_cmap,
             vmin=-1,
             vmax=1)
     plt.colorbar()
     plt.subplot(1,3,3)
     plt.title("Difference")
-    plt.imshow(np.where(np.isnan(difference), -999, difference),
-            cmap='RdYlGn',
+    plt.imshow(np.where(np.isnan(difference), np.nan, difference),
+            cmap=_cmap,
             vmin=-1,
             vmax=1)
     plt.colorbar()

@@ -139,30 +139,30 @@ def summarize_results(data_path: Union[pth.Path, str]) -> None:
     metrics = ["f1", "mcc", "kappa", "iou"]
 
     for method, rows in by_method.items():
-        fields = [r["field"] for r in rows]
-
-        fig, axes = plt.subplots(1, len(metrics), figsize=(5 * len(metrics), 5))
+        n = len(rows)
+        xs = list(range(n))
         summary_lines = [f"Method: {method}"]
 
-        for ax, metric in zip(axes, metrics):
+        for metric in metrics:
             vals = [r[metric] for r in rows]
-            ax.bar(fields, vals)
-            ax.set_title(metric)
+            step = max(1, n // 10)
+
+            fig, ax = plt.subplots(figsize=(6, 5))
+            ax.bar(xs, vals)
+            ax.set_title(f"{method} — {metric}")
             ax.set_ylim(-1 if metric in ("mcc", "kappa") else 0, 1)
-            ax.tick_params(axis="x", rotation=30)
-            for label in ax.get_xticklabels():
-                label.set_ha("right")
+            ax.set_xlabel("num of files")
+            ax.set_xticks(range(0, n, step))
+            fig.tight_layout()
+            fig.savefig(processed / f"summary_{method}_{metric}.png", dpi=150, bbox_inches="tight")
+            plt.close(fig)
+
             summary_lines.append(f"\n{metric}:")
-            for field, val in zip(fields, vals):
-                summary_lines.append(f"  {field}: {val:.3f}")
+            for i, (field, val) in enumerate(zip([r["field"] for r in rows], vals)):
+                summary_lines.append(f"  [{i}] {field}: {val:.3f}")
             summary_lines.append(f"  mean: {np.mean(vals):.3f}")
 
-        plt.suptitle(f"{method} — per field (True class)")
-        plt.tight_layout()
-        fig.savefig(processed / f"summary_{method}.png", dpi=150, bbox_inches="tight")
         (processed / f"summary_{method}.txt").write_text("\n".join(summary_lines))
-        # plt.show()
-        plt.close(fig)
 
 
 if __name__ == "__main__":

@@ -120,7 +120,10 @@ class Detector:
         xy = np.column_stack([cols, rows])  # (N, 2) XY positions
 
         labels = np.full(mask.shape, -1, dtype=int)
-        labels[rows, cols] = self._generate_cluster(xy).ravel()
+        if len(xy) < 2:
+            labels[rows, cols] = 0
+        else:
+            labels[rows, cols] = self._generate_cluster(xy).ravel()
 
         bboxes = self._get_bbox(labels)
         return labels, bboxes
@@ -169,7 +172,7 @@ def _vis_patches(ndvi: np.ndarray, patch_size: int) -> None:
     import matplotlib.pyplot as plt
     h, w = ndvi.shape
     fig, ax = plt.subplots()
-    ax.imshow(np.where(np.isnan(ndvi), -999, ndvi), cmap="RdYlGn", vmin=-1, vmax=1)
+    ax.imshow(np.where(np.isnan(ndvi), np.nan, ndvi), cmap=plt.get_cmap("RdYlGn").copy(), vmin=-1, vmax=1)
     for y in range(0, h, patch_size):
         ax.axhline(y - 0.5, color="blue", linewidth=0.5, alpha=0.6)
     for x in range(0, w, patch_size):
@@ -192,7 +195,9 @@ def plot_clusters(data: np.ndarray, labels: np.ndarray, ax=None,  path: Optional
     cmap = colormaps["tab20"].resampled(len(unique))
     norm = BoundaryNorm(range(len(unique) + 1), cmap.N)
 
-    ax.imshow(np.where(np.isnan(data), -999, data), cmap="RdYlGn", vmin=-1, vmax=1, interpolation="none")
+    _bg_cmap = plt.get_cmap("RdYlGn").copy()
+    _bg_cmap.set_bad("white")
+    ax.imshow(np.where(np.isnan(data), np.nan, data), cmap=_bg_cmap, vmin=-1, vmax=1, interpolation="none")
 
     display = np.full(data.shape, np.nan)
     for i, label in enumerate(unique):
@@ -223,7 +228,9 @@ def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str,
 
     fig, ax = plt.subplots() if ax is None else (None, ax)
 
-    ax.imshow(data, cmap="RdYlGn", vmin=-1, vmax=1, interpolation="none")
+    _bg_cmap = plt.get_cmap("RdYlGn").copy()
+    _bg_cmap.set_bad("white")
+    ax.imshow(np.where(np.isnan(data), np.nan, data), cmap=_bg_cmap, vmin=-1, vmax=1, interpolation="none")
 
     for label, (x, y, w, h) in bboxes.items():
         rect = patches.Rectangle((x, y), w, h, linewidth=1, edgecolor="blue", facecolor="none")
@@ -297,9 +304,18 @@ def plot_bbox_on_map(tif_path: Union[str, pth.Path], ndvi: np.ndarray, bboxes: d
 
     ax.set_title("Cluster bounding boxes")
 
-    from matplotlib.ticker import FuncFormatter
+    from matplotlib.ticker import FuncFormatter, MaxNLocator
     from pyproj import Transformer
     tr = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
+
+    figw, figh = fig.get_size_inches()
+    ax_w = ax.get_position().width * figw
+    ax_h = ax.get_position().height * figh
+    n_x = max(2, min(6, int(ax_w / 1.4)))
+    n_y = max(2, min(6, int(ax_h / 1.4)))
+
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=n_x, prune="both"))
+    ax.yaxis.set_major_locator(MaxNLocator(nbins=n_y, prune="both"))
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{tr.transform(v, 0)[0]:.5f}°"))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{tr.transform(0, v)[1]:.5f}°"))
     ax.set_xlabel("Longitude")
