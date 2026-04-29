@@ -208,7 +208,7 @@ def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str,
     ax.imshow(data, cmap="RdYlGn", vmin=-1, vmax=1, interpolation="none")
 
     for label, (x, y, w, h) in bboxes.items():
-        rect = patches.Rectangle((x, y), w, h, linewidth=1, edgecolor="red", facecolor="none")
+        rect = patches.Rectangle((x, y), w, h, linewidth=1, edgecolor="blue", facecolor="none")
         ax.add_patch(rect)
         ax.text(x, y - 2, str(label), color="red", fontsize=8)
 
