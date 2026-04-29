@@ -171,7 +171,7 @@ def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str,
     ax.imshow(data, cmap="RdYlGn", vmin=-1, vmax=1, interpolation="none")
 
     for label, (x, y, w, h) in bboxes.items():
-        rect = patches.Rectangle((x, y), w, h, linewidth=1, edgecolor="red", facecolor="none")
+        rect = patches.Rectangle((x, y), w, h, linewidth=1, edgecolor="blue", facecolor="none")
         ax.add_patch(rect)
         ax.text(x, y - 2, str(label), color="red", fontsize=8)
 
@@ -188,6 +188,55 @@ def plot_bbox(data: np.ndarray, bboxes: dict, ax=None, path: Optional[Union[str,
 
 
 
+
+
+def plot_on_map(tiff_path: Union[str, pth.Path], mask: np.ndarray, bboxes: dict, path: Optional[Union[str, pth.Path]] = None) -> None:
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    import contextily as ctx
+    from rasterio.warp import transform_bounds
+    from rasterio.transform import array_bounds
+    import matplotlib.colors as mcolors
+
+    with rio.open(tiff_path) as ds:
+        transform = ds.transform
+        crs = ds.crs
+        bounds = ds.bounds
+
+    # reproject bounds to Web Mercator (EPSG:3857) for contextily
+    west, south, east, north = transform_bounds(crs, "EPSG:3857", *bounds)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    # overlay mask
+    mask_rgba = np.zeros((*mask.shape, 4), dtype=np.float32)
+    mask_rgba[mask, :] = [0.2, 0.8, 0.2, 0.6]  # green, semi-transparent
+    ax.imshow(mask_rgba, extent=[west, east, south, north], origin="upper", zorder=2)
+
+    # draw bboxes in geographic coords
+    for label, (px, py, pw, ph) in bboxes.items():
+        x0, y0 = transform * (px, py)
+        x1, y1 = transform * (px + pw, py + ph)
+        # reproject corners to EPSG:3857
+        from rasterio.warp import transform as warp_transform
+        xs, ys = warp_transform(crs, "EPSG:3857", [x0, x1], [y0, y1])
+        rx, ry, rw, rh = xs[0], ys[1], xs[1] - xs[0], ys[0] - ys[1]
+        rect = patches.Rectangle((rx, ry), rw, rh, linewidth=1.5, edgecolor="red", facecolor="none", zorder=3)
+        ax.add_patch(rect)
+        ax.text(rx, ry + rh + rh * 0.05, str(label), color="red", fontsize=7, zorder=4)
+
+    ax.set_xlim(west, east)
+    ax.set_ylim(south, north)
+    ctx.add_basemap(ax, crs="EPSG:3857", source=ctx.providers.OpenStreetMap.Mapnik, zorder=1)
+    ax.set_title("NDVI Mask + Bounding Boxes")
+    ax.axis("off")
+    plt.tight_layout()
+
+    if path is None:
+        plt.show()
+    else:
+        plt.savefig(pth.Path(path), dpi=300, bbox_inches="tight")
+    plt.close(fig)
 
 
 def cluster_data(path: Optional[Union[str, pth.Path]]) -> None:
