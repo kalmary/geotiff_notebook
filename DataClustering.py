@@ -296,6 +296,15 @@ def plot_bbox_on_map(tif_path: Union[str, pth.Path], ndvi: np.ndarray, bboxes: d
         ax.text(xs[0], ys[0] + (ys[0] - ys[1]) * 0.03, str(label), color="blue", fontsize=8)
 
     ax.set_title("Cluster bounding boxes")
+
+    from matplotlib.ticker import FuncFormatter
+    from pyproj import Transformer
+    tr = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{tr.transform(v, 0)[0]:.5f}°"))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{tr.transform(0, v)[1]:.5f}°"))
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+
     plt.tight_layout()
 
     if path is None:
