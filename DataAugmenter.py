@@ -346,7 +346,7 @@ def augment_ndvi(ndvi: np.ndarray):
 
     methods = {
         0: ("boars", [5, 10, 0.9]),
-        1: ("drought", [1, 2, 0.7]),
+        1: ("drought", [1, 2, 0.8]),
         2: ("flood", [1, 3, 0.95])
     }
 
@@ -404,14 +404,17 @@ def augment_data(path: Optional[Union[str, pth.Path]]) -> None:
             "augmented": results,
             "diff": diff}
 
-        
-        
+        scale = 0.5
+        from rasterio.transform import Affine
+        t = dataset.transform
+        lowres_transform = Affine(t.a / scale, t.b, t.c, t.d, t.e / scale, t.f)
+
         for key, result in results.items():
             file_name = tiff_dir.joinpath(path.stem + f"_{key}.tif")
 
             save_tiff(file_name,
                   {key: result},
-                  dataset.transform,
+                  lowres_transform,
                   dataset.crs)
 
             plt_path = plots_dir.joinpath(path.stem + f"_{key}.png")
@@ -443,13 +446,13 @@ def test_augmentation():
     ndvi_lowres = downsample_image_nan_safe(ndvi, scale=0.5)
 
     sim = NDVIdecreaseSimulator(ndvi_lowres.copy())
-    methods = {
+    cause = {
         0: ("boars", [5, 10, 0.9]),
-        1: ("drought", [1, 2, 0.7]),
+        1: ("drought", [1, 2, 0.8]),
         2: ("flood", [1, 3, 0.95])
     }
-    curr_cause_idx = 2
-    sim.apply(DegradationEvent(cause=cause[curr_cause_idx][0], seed=42, count=1, intensity=cause[curr_cause_idx][2]))
+    curr_cause_idx = 0
+    sim.apply(DegradationEvent(cause=cause[curr_cause_idx][0], seed=42, count=3, intensity=cause[curr_cause_idx][1][2]))
 
     results = sim.result
     difference = ndvi_lowres - results
@@ -463,7 +466,7 @@ def test_augmentation():
             vmax=1)
     plt.colorbar()
     plt.subplot(1,3,2)
-    plt.title(f"Augmented NDVI\nCause: {cause[curr_cause_idx][0]}, Count: 1, Intensity: {cause[curr_cause_idx][2]}")
+    plt.title(f"Augmented NDVI\nCause: {cause[curr_cause_idx][0]}, Count: 1, Intensity: {cause[curr_cause_idx][1][2]}")
     plt.imshow(np.where(np.isnan(results), -999, results),
             cmap='RdYlGn',
             vmin=-1,
