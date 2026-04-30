@@ -2,6 +2,7 @@
 import pathlib as pth
 from utils import load_data, save_tiff
 from utils import downsample_image_nan_safe
+from typing import Union
 
 import numpy as np
 import matplotlib.pyplot as plt
